@@ -3,56 +3,59 @@ using System.Net.Http.Json;
 
 namespace CreateBatchFilesForScummVMGames;
 
-/// <inheritdoc />
 /// <summary>
-/// Service responsible for silently sending bug reports to the BugReport API
+/// Service responsible for silently sending bug reports to the BugReport API.
+/// This class is designed to be used as a singleton via the App class.
 /// </summary>
-public class BugReportService(string apiUrl, string apiKey, string applicationName) : IDisposable
+public class BugReportService
 {
-    private readonly HttpClient _httpClient = new();
-    private readonly string _apiUrl = apiUrl;
-    private readonly string _apiKey = apiKey;
-    private readonly string _applicationName = applicationName;
+    // Use a single, static HttpClient instance for the application's lifetime
+    // to prevent socket exhaustion and improve performance.
+    private static readonly HttpClient HttpClient = new();
+
+    private readonly string _apiUrl;
+    private readonly string _apiKey;
+    private readonly string _applicationName;
+
+    public BugReportService(string apiUrl, string apiKey, string applicationName)
+    {
+        _apiUrl = apiUrl;
+        _apiKey = apiKey;
+        _applicationName = applicationName;
+    }
 
     /// <summary>
-    /// Silently sends a bug report to the API
+    /// Silently sends a bug report to the API.
     /// </summary>
-    /// <param name="message">The error message or bug report</param>
-    /// <returns>A task representing the asynchronous operation</returns>
-    public async Task<bool> SendBugReportAsync(string message)
+    /// <param name="message">The error message or bug report.</param>
+    /// <returns>A task representing the asynchronous operation, returning true if successful.</returns>
+    public async Task SendBugReportAsync(string message)
     {
         try
         {
-            // Add the API key to the headers
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Add("X-API-KEY", _apiKey);
-
             // Create the request payload
-            var content = JsonContent.Create(new
+            var payload = new
             {
                 message,
                 applicationName = _applicationName
-            });
+            };
 
-            // Send the request
-            var response = await _httpClient.PostAsync(_apiUrl, content);
+            // Create a new HttpRequestMessage for each call. This is thread-safe and ensures
+            // headers from one request do not interfere with another.
+            using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+            request.Content = JsonContent.Create(payload);
+            request.Headers.Add("X-API-KEY", _apiKey);
+
+            // Send the request using the static HttpClient
+            await HttpClient.SendAsync(request);
 
             // Return true if successful
-            return response.IsSuccessStatusCode;
+            return;
         }
         catch
         {
             // Silently fail if there's an exception
-            return false;
+            return;
         }
-    }
-
-    public void Dispose()
-    {
-        // Dispose of the HttpClient
-        _httpClient?.Dispose();
-
-        // Suppress finalization since we've cleaned up resources
-        GC.SuppressFinalize(this);
     }
 }

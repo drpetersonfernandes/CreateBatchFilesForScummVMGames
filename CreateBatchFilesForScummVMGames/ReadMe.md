@@ -1,19 +1,17 @@
-```markdown
 # Batch File Creator for ScummVM Games
-
-## Overview
 
 This application helps you create batch files for launching your ScummVM games. It simplifies the process of setting up individual batch files for each game, allowing you to quickly launch your favorite ScummVM titles.
 
 ## Features
 
--   **User-Friendly Interface:** A simple and intuitive graphical user interface (GUI) for easy interaction.
+-   **User-Friendly Interface:** A simple and intuitive graphical user interface (GUI) with a top menu and status bar for easy interaction.
 -   **ScummVM Executable Selection:** Allows you to browse and select the path to your `scummvm.exe` file.
 -   **Game Folder Selection:** Lets you choose the root folder containing your ScummVM game folders.
 -   **Automated Batch File Creation:** Automatically generates batch files for each game folder within the selected root folder.
 -   **Logging:** Provides a log window to display the progress and any errors that occur during the batch file creation process.
+-   **Status Bar:** Displays real-time status messages about the application's state.
 -   **Error Handling:** Includes error handling and reporting to ensure smooth operation and provide helpful feedback.
--   **Bug Reporting:** Automatically sends error reports to a backend API for tracking and fixing issues.
+-   **Silent Bug Reporting:** Automatically sends error reports to a backend API for tracking and fixing issues.
 
 ## How to Use
 
@@ -25,7 +23,7 @@ This application helps you create batch files for launching your ScummVM games. 
 ## System Requirements
 
 -   Windows Operating System
--   .NET Framework (likely 4.7.2 or higher, based on WPF usage)
+-   .NET 9 Desktop Runtime
 -   ScummVM installed
 
 ## Installation
@@ -36,22 +34,16 @@ This application helps you create batch files for launching your ScummVM games. 
 
 ## Code Structure
 
--   **App.xaml & App.xaml.cs:** Defines the application and handles global exception handling. It also initializes the `BugReportService`.
--   **MainWindow.xaml:** Defines the main window's user interface, including text boxes, buttons, and layout.
--   **MainWindow.xaml.cs:** Contains the logic for the main window, including:
-    -   Handling button clicks for browsing and creating batch files.
-    -   Selecting folders and files using `OpenFolderDialog` and `OpenFileDialog`.
-    -   Creating batch files for each game folder.
-    -   Logging messages to the UI.
-    -   Error handling and displaying messages to the user.
-    -   Reporting bugs using the `BugReportService`.
--   **BugReportService.cs:** Implements a service for sending bug reports to a remote API.
+-   **App.xaml & App.xaml.cs:** Defines the application, handles global exception handling, and centrally manages the `BugReportService` instance.
+-   **MainWindow.xaml & MainWindow.xaml.cs:** Defines the main window's UI and logic, including the menu, status bar, input fields, and batch file creation process.
+-   **AboutWindow.xaml & AboutWindow.xaml.cs:** A separate window that displays application information, version, and credits.
+-   **BugReportService.cs:** Implements a service for sending bug reports to a remote API. It uses a single, static `HttpClient` for efficiency.
 
 ## Error Reporting
 
-The application includes a `BugReportService` that silently sends error reports to a specified API endpoint. This helps the developer track and fix issues. The API URL and key are defined as constants in `App.xaml.cs` and `MainWindow.xaml.cs`.
+The application includes a `BugReportService` that silently sends error reports to a specified API endpoint. This helps the developer track and fix issues. The API URL and key are defined as constants in `App.xaml.cs`.
 
-**Important:** The `BugReportApiUrl` and `BugReportApiKey` are placeholders.  You will need to replace them with your own values if you want to use the bug reporting functionality.
+**Important:** The `BugReportApiUrl` and `BugReportApiKey` are placeholders. You will need to replace them with your own values if you want to use the bug reporting functionality.
 
 ## Batch File Format
 
@@ -59,24 +51,3 @@ Each generated batch file contains the following command:
 
 ```batch
 "path\to\scummvm.exe" -p "path\to\game\folder" --auto-detect --fullscreen
-```
-
--   `"path\to\scummvm.exe"`:  The path to your ScummVM executable.
--   `"path\to\game\folder"`: The path to the specific game folder.
--   `--auto-detect`: Tells ScummVM to automatically detect the game.
--   `--fullscreen`: Launches the game in fullscreen mode.
-
-## Dependencies
-
--   .NET Framework (WPF)
--   `System.Net.Http`
--   `System.Net.Http.Json`
--   `Microsoft.Win32` (for `OpenFileDialog` and `OpenFolderDialog`)
-
-## Notes
-
--   The application assumes that each subdirectory within the selected "Games Folder" represents a separate ScummVM game.
--   The application creates batch files in the root folder, alongside the game folders.
--   Error reporting is silent; the user will not be notified if a bug report fails to send.
-
-```

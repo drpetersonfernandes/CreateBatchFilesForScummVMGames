@@ -7,21 +7,11 @@ using Microsoft.Win32;
 
 namespace CreateBatchFilesForScummVMGames;
 
-public partial class MainWindow : IDisposable
+public partial class MainWindow
 {
-    private readonly BugReportService _bugReportService;
-
-    // Bug Report API configuration
-    private const string BugReportApiUrl = "https://www.purelogiccode.com/bugreport/api/send-bug-report";
-    private const string BugReportApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
-    private const string ApplicationName = "CreateBatchFilesForScummVMGames";
-
     public MainWindow()
     {
         InitializeComponent();
-
-        // Initialize the bug report service
-        _bugReportService = new BugReportService(BugReportApiUrl, BugReportApiKey, ApplicationName);
 
         LogMessage("Welcome to the Batch File Creator for ScummVM Games.");
         LogMessage("");
@@ -31,12 +21,20 @@ public partial class MainWindow : IDisposable
         LogMessage("2. Select the root folder containing your ScummVM game folders");
         LogMessage("3. Click 'Create Batch Files' to generate the batch files");
         LogMessage("");
+        UpdateStatusBarMessage("Ready");
+    }
+
+    private void UpdateStatusBarMessage(string message)
+    {
+        Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            StatusBarMessage.Text = message;
+        });
     }
 
     private void Window_Closing(object sender, CancelEventArgs e)
     {
         Application.Current.Shutdown();
-        Environment.Exit(0);
     }
 
     private void LogMessage(string message)
@@ -55,6 +53,7 @@ public partial class MainWindow : IDisposable
 
         ScummVmPathTextBox.Text = scummvmExePath;
         LogMessage($"ScummVM executable selected: {scummvmExePath}");
+        UpdateStatusBarMessage("ScummVM executable selected.");
 
         if (scummvmExePath.EndsWith("scummvm.exe", StringComparison.OrdinalIgnoreCase)) return;
 
@@ -69,6 +68,7 @@ public partial class MainWindow : IDisposable
 
         GameFolderTextBox.Text = rootFolder;
         LogMessage($"Game folder selected: {rootFolder}");
+        UpdateStatusBarMessage("Game folder selected.");
     }
 
     private async void CreateBatchFilesButton_Click(object sender, RoutedEventArgs e)
@@ -82,6 +82,7 @@ public partial class MainWindow : IDisposable
             {
                 LogMessage("Error: No ScummVM executable selected.");
                 ShowError("Please select the ScummVM executable file (scummvm.exe).");
+                UpdateStatusBarMessage("Error: ScummVM executable not selected.");
                 return;
             }
 
@@ -90,6 +91,7 @@ public partial class MainWindow : IDisposable
                 LogMessage($"Error: ScummVM executable not found at path: {scummvmExePath}");
                 ShowError("The selected ScummVM executable file does not exist.");
                 await ReportBugAsync("ScummVM executable not found", new FileNotFoundException("The ScummVM executable was not found", scummvmExePath));
+                UpdateStatusBarMessage("Error: ScummVM executable not found.");
                 return;
             }
 
@@ -97,6 +99,7 @@ public partial class MainWindow : IDisposable
             {
                 LogMessage("Error: No game folder selected.");
                 ShowError("Please select the root folder containing your ScummVM game folders.");
+                UpdateStatusBarMessage("Error: Game folder not selected.");
                 return;
             }
 
@@ -105,6 +108,7 @@ public partial class MainWindow : IDisposable
                 LogMessage($"Error: Game folder not found at path: {rootFolder}");
                 ShowError("The selected game folder does not exist.");
                 await ReportBugAsync("Game folder not found", new DirectoryNotFoundException($"Game folder not found: {rootFolder}"));
+                UpdateStatusBarMessage("Error: Game folder not found.");
                 return;
             }
 
@@ -117,11 +121,13 @@ public partial class MainWindow : IDisposable
                 LogMessage($"Error creating batch files: {ex.Message}");
                 ShowError($"An error occurred while creating batch files: {ex.Message}");
                 await ReportBugAsync("Error creating batch files", ex);
+                UpdateStatusBarMessage("Process failed with an error.");
             }
         }
         catch (Exception ex)
         {
             await ReportBugAsync("Error creating batch files", ex);
+            UpdateStatusBarMessage("An unexpected error occurred.");
         }
     }
 
@@ -156,7 +162,7 @@ public partial class MainWindow : IDisposable
 
             LogMessage("");
             LogMessage("Starting batch file creation process...");
-            LogMessage("");
+            UpdateStatusBarMessage("Creating batch files...");
 
             foreach (var gameDirectory in gameDirectories)
             {
@@ -185,6 +191,7 @@ public partial class MainWindow : IDisposable
                 LogMessage("");
                 LogMessage($"{filesCreated} batch files have been successfully created.");
                 LogMessage("They are located in the root folder of your ScummVM games.");
+                UpdateStatusBarMessage($"{filesCreated} batch files created successfully.");
 
                 ShowMessageBox($"{filesCreated} batch files have been successfully created.\n\n" +
                                "They are located in the root folder of your ScummVM games.",
@@ -194,6 +201,7 @@ public partial class MainWindow : IDisposable
             {
                 LogMessage("No game folders found. No batch files were created.");
                 ShowError("No game folders found. No batch files were created.");
+                UpdateStatusBarMessage("No game folders found. No files were created.");
                 _ = ReportBugAsync("No game folders found",
                     new DirectoryNotFoundException("No subdirectories found in the game folder"));
             }
@@ -201,6 +209,7 @@ public partial class MainWindow : IDisposable
         catch (Exception ex)
         {
             LogMessage($"Error accessing folder structure: {ex.Message}");
+            UpdateStatusBarMessage("Error accessing folder structure.");
             _ = ReportBugAsync("Error accessing folder structure during batch file creation", ex);
             throw;
         }
@@ -209,7 +218,7 @@ public partial class MainWindow : IDisposable
     private void ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
     {
         Dispatcher.Invoke(() =>
-            MessageBox.Show(message, title, buttons, icon));
+            MessageBox.Show(this, message, title, buttons, icon));
     }
 
     private void ShowError(string message)
@@ -217,19 +226,17 @@ public partial class MainWindow : IDisposable
         ShowMessageBox(message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
-    /// <summary>
-    /// Silently reports bugs/errors to the API
-    /// </summary>
     private async Task ReportBugAsync(string message, Exception? exception = null)
     {
         try
         {
             var fullReport = new StringBuilder();
+            var assemblyName = GetType().Assembly.GetName();
 
             // Add system information
             fullReport.AppendLine("=== Bug Report ===");
-            fullReport.AppendLine($"Application: {ApplicationName}");
-            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Version: {GetType().Assembly.GetName().Version}");
+            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Application: {assemblyName.Name}");
+            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Version: {assemblyName.Version}");
             fullReport.AppendLine(CultureInfo.InvariantCulture, $"OS: {Environment.OSVersion}");
             fullReport.AppendLine(CultureInfo.InvariantCulture, $".NET Version: {Environment.Version}");
             fullReport.AppendLine(CultureInfo.InvariantCulture, $"Date/Time: {DateTime.Now}");
@@ -298,8 +305,11 @@ public partial class MainWindow : IDisposable
                 fullReport.AppendLine(CultureInfo.InvariantCulture, $"Games Folder: {gameFolderPath}");
             }
 
-            // Silently send the report
-            await _bugReportService.SendBugReportAsync(fullReport.ToString());
+            // Silently send the report using the shared service from the App class
+            if (App.BugReportService != null)
+            {
+                await App.BugReportService.SendBugReportAsync(fullReport.ToString());
+            }
         }
         catch
         {
@@ -307,14 +317,22 @@ public partial class MainWindow : IDisposable
         }
     }
 
-    public void Dispose()
+    private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        // Dispose the bug report service
-        _bugReportService?.Dispose();
+        Close();
+    }
 
-        // If there are any other disposable resources, dispose them here
-
-        // Suppress finalization
-        GC.SuppressFinalize(this);
+    private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var aboutWindow = new AboutWindow();
+            aboutWindow.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            LogMessage($"Error opening About window: {ex.Message}");
+            _ = ReportBugAsync("Error opening About window", ex);
+        }
     }
 }

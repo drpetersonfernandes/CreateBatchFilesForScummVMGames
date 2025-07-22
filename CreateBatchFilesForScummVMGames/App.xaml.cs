@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Windows.Threading;
 
@@ -8,19 +8,22 @@ namespace CreateBatchFilesForScummVMGames;
 /// <summary>
 /// Interaction logic for App.xaml
 /// </summary>
-public partial class App : IDisposable
+public partial class App
 {
-    // Bug Report API configuration
+    // Bug Report API configuration is now centralized here.
     private const string BugReportApiUrl = "https://www.purelogiccode.com/bugreport/api/send-bug-report";
     private const string BugReportApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
     private const string ApplicationName = "CreateBatchFilesForScummVMGames";
 
-    private readonly BugReportService? _bugReportService;
+    /// <summary>
+    /// Provides a single, shared instance of the BugReportService for the entire application.
+    /// </summary>
+    public static BugReportService? BugReportService { get; private set; }
 
     public App()
     {
-        // Initialize the bug report service
-        _bugReportService = new BugReportService(BugReportApiUrl, BugReportApiKey, ApplicationName);
+        // Initialize the single bug report service instance for the application.
+        BugReportService = new BugReportService(BugReportApiUrl, BugReportApiKey, ApplicationName);
 
         // Set up global exception handling
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -54,10 +57,10 @@ public partial class App : IDisposable
         {
             var message = BuildExceptionReport(exception, source);
 
-            // Silently report the exception to our API
-            if (_bugReportService != null)
+            // Silently report the exception to our API using the shared service instance.
+            if (BugReportService != null)
             {
-                await _bugReportService.SendBugReportAsync(message);
+                await BugReportService.SendBugReportAsync(message);
             }
         }
         catch
@@ -105,19 +108,5 @@ public partial class App : IDisposable
 
             break;
         }
-    }
-
-    public void Dispose()
-    {
-        // Dispose the bug report service if it exists
-        _bugReportService?.Dispose();
-
-        // Unsubscribe from event handlers to prevent memory leaks
-        AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
-        DispatcherUnhandledException -= App_DispatcherUnhandledException;
-        TaskScheduler.UnobservedTaskException -= TaskScheduler_UnobservedTaskException;
-
-        // Suppress finalization since we've cleaned up resources
-        GC.SuppressFinalize(this);
     }
 }
