@@ -23,7 +23,7 @@ This application helps you create batch files for launching your ScummVM games. 
 ## System Requirements
 
 -   Windows Operating System
--   .NET 9 Desktop Runtime
+-   .NET 10 Desktop Runtime
 -   ScummVM installed
 
 ## Installation
