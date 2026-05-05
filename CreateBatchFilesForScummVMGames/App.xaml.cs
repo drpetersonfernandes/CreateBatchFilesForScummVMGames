@@ -1,5 +1,8 @@
 ﻿using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Windows;
 using System.Windows.Threading;
 
 namespace CreateBatchFilesForScummVMGames;
@@ -15,15 +18,32 @@ public partial class App
     private const string BugReportApiKey = "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e";
     private const string ApplicationName = "CreateBatchFilesForScummVMGames";
 
+    // Application Stats API configuration.
+    private const string StatsApiUrl = "https://www.purelogiccode.com/ApplicationStats/stats";
+    private const string StatsApplicationId = "createbatchfilesforscummvmgames";
+
+    private static bool _isShuttingDown;
+
     /// <summary>
     /// Provides a single, shared instance of the BugReportService for the entire application.
     /// </summary>
     public static BugReportService? BugReportService { get; private set; }
 
+    /// <summary>
+    /// Provides a single, shared instance of the ApplicationStatsService for the entire application.
+    /// </summary>
+    public static ApplicationStatsService? ApplicationStatsService { get; private set; }
+
     public App()
     {
+        var version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0";
+
         // Initialize the single bug report service instance for the application.
         BugReportService = new BugReportService(BugReportApiUrl, BugReportApiKey, ApplicationName);
+
+        // Initialize the application stats service and track this launch.
+        ApplicationStatsService = new ApplicationStatsService(StatsApiUrl, BugReportApiKey, StatsApplicationId, version);
+        TrackApplicationLaunch();
 
         // Set up global exception handling
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -31,36 +51,84 @@ public partial class App
         TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
     }
 
-    private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+    private static async void TrackApplicationLaunch()
     {
-        if (e.ExceptionObject is Exception exception)
+        try
         {
-            ReportException(exception, "AppDomain.UnhandledException");
+            if (ApplicationStatsService != null)
+            {
+                await ApplicationStatsService.SendUsageStatAsync();
+            }
+        }
+        catch
+        {
+            // Silently ignore any errors in the tracking process
         }
     }
 
-    private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
-        ReportException(e.Exception, "Application.DispatcherUnhandledException");
+        _isShuttingDown = true;
+        try
+        {
+            BugReportService?.Dispose();
+        }
+        catch
+        {
+            // ignored
+        }
+
+        try
+        {
+            ApplicationStatsService?.Dispose();
+        }
+        catch
+        {
+            // ignored
+        }
+
+        base.OnExit(e);
+    }
+
+    private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (_isShuttingDown) return;
+
+        if (e.ExceptionObject is Exception exception)
+        {
+            ReportExceptionAsync(exception, "AppDomain.UnhandledException");
+        }
+    }
+
+    private static void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        if (_isShuttingDown) return;
+
+        ReportExceptionAsync(e.Exception, "Application.DispatcherUnhandledException");
         e.Handled = true;
     }
 
-    private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    private static void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        ReportException(e.Exception, "TaskScheduler.UnobservedTaskException");
+        if (_isShuttingDown) return;
+
+        ReportExceptionAsync(e.Exception, "TaskScheduler.UnobservedTaskException");
         e.SetObserved();
     }
 
-    private async void ReportException(Exception exception, string source)
+    private static async void ReportExceptionAsync(Exception exception, string source)
     {
         try
         {
             var message = BuildExceptionReport(exception, source);
+            var version = typeof(App).Assembly.GetName().Version?.ToString();
+            var environment = RuntimeInformation.OSDescription;
+            var stackTrace = exception.StackTrace;
 
             // Silently report the exception to our API using the shared service instance.
             if (BugReportService != null)
             {
-                await BugReportService.SendBugReportAsync(message);
+                await BugReportService.SendBugReportAsync(message, version, environment, stackTrace);
             }
         }
         catch
@@ -69,23 +137,46 @@ public partial class App
         }
     }
 
-    private string BuildExceptionReport(Exception exception, string source)
+    internal static string BuildEnvironmentDetails()
     {
         var sb = new StringBuilder();
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Error Source: {source}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Date and Time: {DateTime.Now}");
+        var assemblyName = typeof(App).Assembly.GetName();
+
+        sb.AppendLine("=== Environment Details ===");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Date: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Application Name: {assemblyName.Name}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Application Version: {assemblyName.Version}");
         sb.AppendLine(CultureInfo.InvariantCulture, $"OS Version: {Environment.OSVersion}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $".NET Version: {Environment.Version}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Architecture: {RuntimeInformation.ProcessArchitecture}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Bitness: {(Environment.Is64BitProcess ? "64-bit" : "32-bit")}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Windows Version: {RuntimeInformation.OSDescription}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Processor Count: {Environment.ProcessorCount}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Base Directory: {AppContext.BaseDirectory}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Temp Path: {Path.GetTempPath()}");
+        sb.AppendLine();
+
+        return sb.ToString();
+    }
+
+    internal static string BuildExceptionReport(Exception exception, string source)
+    {
+        var sb = new StringBuilder();
+
+        sb.Append(BuildEnvironmentDetails());
+
+        sb.AppendLine("=== Error Details ===");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Error Source: {source}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Error Message: {exception.Message}");
         sb.AppendLine();
 
         // Add exception details
-        sb.AppendLine("Exception Details:");
+        sb.AppendLine("=== Exception Details ===");
         AppendExceptionDetails(sb, exception);
 
         return sb.ToString();
     }
 
-    private void AppendExceptionDetails(StringBuilder sb, Exception exception, int level = 0)
+    internal static void AppendExceptionDetails(StringBuilder sb, Exception exception, int level = 0)
     {
         while (true)
         {
@@ -102,7 +193,7 @@ public partial class App
             {
                 sb.AppendLine(CultureInfo.InvariantCulture, $"{indent}Inner Exception:");
                 exception = exception.InnerException;
-                level = level + 1;
+                level += 1;
                 continue;
             }
 

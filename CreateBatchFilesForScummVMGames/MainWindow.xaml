@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Batch File Creator for ScummVM Games"
         Height="550" Width="800" MinHeight="500" MinWidth="600"
-        Closing="Window_Closing"
+        Style="{StaticResource DarkWindowStyle}"
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
@@ -13,15 +13,15 @@
         </Grid.RowDefinitions>
 
         <Menu Grid.Row="0">
-            <MenuItem Header="_File">
-                <MenuItem Header="E_xit" Click="ExitMenuItem_Click">
+            <MenuItem Header="_File" ToolTip="File operations">
+                <MenuItem Header="E_xit" Click="ExitMenuItem_Click" ToolTip="Close the application">
                     <MenuItem.Icon>
                         <Image Source="pack://application:,,,/images/exit.png" Width="16" Height="16" />
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
-            <MenuItem Header="_Help">
-                <MenuItem Header="_About" Click="AboutMenuItem_Click">
+            <MenuItem Header="_Help" ToolTip="Help and information">
+                <MenuItem Header="_About" Click="AboutMenuItem_Click" ToolTip="View application version and details">
                     <MenuItem.Icon>
                         <Image Source="pack://application:,,,/images/about.png" Width="16" Height="16" />
                     </MenuItem.Icon>
@@ -35,6 +35,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -45,9 +46,10 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Column="0" Content="ScummVM Path:" VerticalAlignment="Center"/>
-                <TextBox x:Name="ScummVmPathTextBox" Grid.Column="1" Margin="5,0,5,0" Padding="5" IsReadOnly="True"/>
-                <Button x:Name="BrowseScummVmButton" Grid.Column="2" Content="Browse" Click="BrowseScummVMButton_Click" Padding="10,5"/>
+                <Label Grid.Column="0" Content="ScummVM Path:" VerticalAlignment="Center" ToolTip="Path to the ScummVM executable file"/>
+                <TextBox x:Name="ScummVmPathTextBox" Grid.Column="1" Margin="5,0,5,0" IsReadOnly="True"
+                         Style="{StaticResource PathTextBoxStyle}" ToolTip="Selected ScummVM executable path"/>
+                <Button x:Name="BrowseScummVmButton" Grid.Column="2" Content="Browse" Click="BrowseScummVMButton_Click" Padding="10,5" ToolTip="Browse for the ScummVM executable (.exe)"/>
             </Grid>
             
             <!-- Game Folder Selection -->
@@ -57,29 +59,37 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Column="0" Content="Games Folder:" VerticalAlignment="Center"/>
-                <TextBox x:Name="GameFolderTextBox" Grid.Column="1" Margin="5,0,5,0" Padding="5" IsReadOnly="True"/>
-                <Button x:Name="BrowseFolderButton" Grid.Column="2" Content="Browse" Click="BrowseFolderButton_Click" Padding="10,5"/>
+                <Label Grid.Column="0" Content="Games Folder:" VerticalAlignment="Center" ToolTip="Root folder containing game subfolders"/>
+                <TextBox x:Name="GameFolderTextBox" Grid.Column="1" Margin="5,0,5,0" IsReadOnly="True"
+                         Style="{StaticResource PathTextBoxStyle}" ToolTip="Selected games folder path"/>
+                <Button x:Name="BrowseFolderButton" Grid.Column="2" Content="Browse" Click="BrowseFolderButton_Click" Padding="10,5" ToolTip="Browse for the folder containing your games"/>
             </Grid>
             
             <!-- Create Batch Files Button -->
-            <Button x:Name="CreateBatchFilesButton" Grid.Row="2" Content="Create Batch Files" Click="CreateBatchFilesButton_Click" 
-                    Margin="10,10,10,15" Padding="15,8" HorizontalAlignment="Center" FontWeight="Bold"/>
+            <Button x:Name="CreateBatchFilesButton" Grid.Row="2" Content="Create Batch Files" Click="CreateBatchFilesButton_ClickAsync" 
+                    Style="{StaticResource PrimaryButtonStyle}" Margin="10,10,10,5" HorizontalAlignment="Center"
+                    ToolTip="Generate batch files and optional .scummvm files for each game subfolder found"/>
+            
+            <!-- ScummVM Checkbox -->
+            <CheckBox x:Name="CreateScummVmCheckBox" Grid.Row="3" Content="Also create .scummvm files (auto-detect game IDs)"
+                      Margin="10,0,10,15" HorizontalAlignment="Center" IsChecked="False"
+                      ToolTip="When enabled, .scummvm files are created alongside batch files with auto-detected game IDs"/>
             
             <!-- Log TextBox -->
             <TextBox x:Name="LogTextBox"
-                     Grid.Row="3"
+                     Grid.Row="4"
+                     Style="{StaticResource LogTextBoxStyle}"
                      AcceptsReturn="True"
                      VerticalScrollBarVisibility="Visible"
                      IsReadOnly="True"
                      Margin="10,0,10,10"
-                     FontFamily="Consolas"/>
+                     ToolTip="Displays progress and results of the batch file creation process"/>
         </Grid>
 
         <!-- Status Bar -->
         <StatusBar Grid.Row="2">
             <StatusBarItem>
-                <TextBlock x:Name="StatusBarMessage" Text="Ready" />
+                <TextBlock x:Name="StatusBarMessage" Text="Ready" ToolTip="Application status messages" />
             </StatusBarItem>
         </StatusBar>
     </Grid>

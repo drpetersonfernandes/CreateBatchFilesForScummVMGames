@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
 
@@ -16,7 +15,7 @@ public partial class AboutWindow
 
     private static string GetApplicationVersion()
     {
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        var version = typeof(AboutWindow).Assembly.GetName().Version;
         return version?.ToString() ?? "Unknown";
     }
 

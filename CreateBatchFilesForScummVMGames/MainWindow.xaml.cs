@@ -1,8 +1,10 @@
-using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using CreateBatchFilesForScummVMGames.Services;
 using Microsoft.Win32;
 
 namespace CreateBatchFilesForScummVMGames;
@@ -26,20 +28,15 @@ public partial class MainWindow
 
     private void UpdateStatusBarMessage(string message)
     {
-        Application.Current.Dispatcher.InvokeAsync(() =>
+        Application.Current?.Dispatcher.InvokeAsync(() =>
         {
             StatusBarMessage.Text = message;
         });
     }
 
-    private void Window_Closing(object sender, CancelEventArgs e)
-    {
-        Application.Current.Shutdown();
-    }
-
     private void LogMessage(string message)
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        Application.Current?.Dispatcher.InvokeAsync(() =>
         {
             LogTextBox.AppendText(message + Environment.NewLine);
             LogTextBox.ScrollToEnd();
@@ -71,7 +68,7 @@ public partial class MainWindow
         UpdateStatusBarMessage("Game folder selected.");
     }
 
-    private async void CreateBatchFilesButton_Click(object sender, RoutedEventArgs e)
+    private async void CreateBatchFilesButton_ClickAsync(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -141,7 +138,7 @@ public partial class MainWindow
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
-    private string? SelectFile()
+    private static string? SelectFile()
     {
         var dialog = new OpenFileDialog
         {
@@ -153,7 +150,7 @@ public partial class MainWindow
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
-    private void CreateBatchFilesForScummVmGames(string rootFolder, string scummvmExePath)
+    internal void CreateBatchFilesForScummVmGames(string rootFolder, string scummvmExePath, bool createScummVm)
     {
         try
         {
@@ -164,20 +161,41 @@ public partial class MainWindow
             LogMessage("Starting batch file creation process...");
             UpdateStatusBarMessage("Creating batch files...");
 
+            if (createScummVm)
+            {
+                LogMessage("ScummVM file creation is also enabled. Auto-detecting game IDs...");
+            }
+
             foreach (var gameDirectory in gameDirectories)
             {
                 try
                 {
                     var gameFolderName = Path.GetFileName(gameDirectory);
-                    var batchFilePath = Path.Combine(rootFolder, gameFolderName + ".bat");
-
-                    using (StreamWriter sw = new(batchFilePath))
-                    {
-                        sw.WriteLine($"\"{scummvmExePath}\" -p \"{gameDirectory}\" --auto-detect --fullscreen");
-                        LogMessage($"Batch file created: {batchFilePath}");
-                    }
+                    var batchFilePath = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath);
+                    LogMessage($"Batch file created: {batchFilePath}");
 
                     filesCreated++;
+
+                    if (createScummVm)
+                    {
+                        var gameId = DetectGameId(scummvmExePath, gameDirectory, gameFolderName);
+                        if (!string.IsNullOrEmpty(gameId))
+                        {
+                            try
+                            {
+                                CreateScummVmFiles(rootFolder, gameFolderName, gameDirectory, gameId);
+                            }
+                            catch (Exception ex)
+                            {
+                                LogMessage($"  Warning: Could not create .scummvm file for {gameFolderName}: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            LogMessage($"  Warning: Could not detect game ID for {gameFolderName}. Skipping .scummvm file.");
+                            LogMessage("  Verify the game data is valid in ScummVM's 'Add Game' dialog.");
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -215,10 +233,73 @@ public partial class MainWindow
         }
     }
 
+    private void CreateBatchFilesForScummVmGames(string rootFolder, string scummvmExePath)
+    {
+        CreateBatchFilesForScummVmGames(rootFolder, scummvmExePath, CreateScummVmCheckBox.IsChecked == true);
+    }
+
+    internal string? DetectGameId(string scummvmExePath, string gameDirectory, string gameFolderName)
+    {
+        try
+        {
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = scummvmExePath,
+                Arguments = $"-p \"{gameDirectory}\" --detect",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            process.Start();
+
+            if (!process.WaitForExit(15000))
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill();
+                }
+
+                LogMessage($"  Warning: Game ID detection timed out for {gameFolderName}");
+                var partialOutput = process.StandardOutput.ReadToEnd();
+                var partialError = process.StandardError.ReadToEnd();
+                var partialCombined = partialOutput + "\n" + partialError;
+                return GameIdDetector.DetectFromOutput(partialCombined);
+            }
+
+            var output = process.StandardOutput.ReadToEnd();
+            var error = process.StandardError.ReadToEnd();
+            var combined = output + "\n" + error;
+
+            return GameIdDetector.DetectFromOutput(combined);
+        }
+        catch (Exception ex)
+        {
+            LogMessage($"  Warning: Game ID detection error for {gameFolderName}: {ex.Message}");
+            return null;
+        }
+    }
+
+    internal void CreateScummVmFiles(string rootFolder, string gameFolderName, string gameDirectory, string gameId)
+    {
+        var (simplePath, rocknixPath) = BatchFileGenerator.WriteScummVmFiles(rootFolder, gameFolderName, gameDirectory, gameId);
+        LogMessage($"  .scummvm file created (simple): {simplePath}");
+        LogMessage($"  .scummvm file created (Rocknix): {rocknixPath}");
+    }
+
     private void ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
     {
-        Dispatcher.Invoke(() =>
-            MessageBox.Show(this, message, title, buttons, icon));
+        try
+        {
+            Dispatcher.Invoke(() =>
+                MessageBox.Show(this, message, title, buttons, icon));
+        }
+        catch (InvalidOperationException)
+        {
+            // Dispatcher unavailable (e.g., test context) — silently skip UI notification
+        }
     }
 
     private void ShowError(string message)
@@ -233,39 +314,17 @@ public partial class MainWindow
             var fullReport = new StringBuilder();
             var assemblyName = GetType().Assembly.GetName();
 
-            // Add system information
-            fullReport.AppendLine("=== Bug Report ===");
-            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Application: {assemblyName.Name}");
-            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Version: {assemblyName.Version}");
-            fullReport.AppendLine(CultureInfo.InvariantCulture, $"OS: {Environment.OSVersion}");
-            fullReport.AppendLine(CultureInfo.InvariantCulture, $".NET Version: {Environment.Version}");
-            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Date/Time: {DateTime.Now}");
-            fullReport.AppendLine();
+            fullReport.Append(App.BuildEnvironmentDetails());
 
-            // Add a message
-            fullReport.AppendLine("=== Error Message ===");
-            fullReport.AppendLine(message);
+            fullReport.AppendLine("=== Error Details ===");
+            fullReport.AppendLine(CultureInfo.InvariantCulture, $"Error Message: {message}");
             fullReport.AppendLine();
 
             // Add exception details if available
             if (exception != null)
             {
                 fullReport.AppendLine("=== Exception Details ===");
-                fullReport.AppendLine(CultureInfo.InvariantCulture, $"Type: {exception.GetType().FullName}");
-                fullReport.AppendLine(CultureInfo.InvariantCulture, $"Message: {exception.Message}");
-                fullReport.AppendLine(CultureInfo.InvariantCulture, $"Source: {exception.Source}");
-                fullReport.AppendLine("Stack Trace:");
-                fullReport.AppendLine(exception.StackTrace);
-
-                // Add inner exception if available
-                if (exception.InnerException != null)
-                {
-                    fullReport.AppendLine("Inner Exception:");
-                    fullReport.AppendLine(CultureInfo.InvariantCulture, $"Type: {exception.InnerException.GetType().FullName}");
-                    fullReport.AppendLine(CultureInfo.InvariantCulture, $"Message: {exception.InnerException.Message}");
-                    fullReport.AppendLine("Stack Trace:");
-                    fullReport.AppendLine(exception.InnerException.StackTrace);
-                }
+                App.AppendExceptionDetails(fullReport, exception);
             }
 
             // Add log contents if available
@@ -308,7 +367,11 @@ public partial class MainWindow
             // Silently send the report using the shared service from the App class
             if (App.BugReportService != null)
             {
-                await App.BugReportService.SendBugReportAsync(fullReport.ToString());
+                var version = assemblyName.Version?.ToString();
+                var environment = RuntimeInformation.OSDescription;
+                var stackTrace = exception?.StackTrace;
+
+                await App.BugReportService.SendBugReportAsync(fullReport.ToString(), version, environment, stackTrace);
             }
         }
         catch
