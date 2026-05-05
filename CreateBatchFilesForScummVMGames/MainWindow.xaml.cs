@@ -275,7 +275,7 @@ public partial class MainWindow
 
             return GameIdDetector.DetectFromOutput(combined);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             LogMessage($"  Warning: Game ID detection error for {gameFolderName}: {ex.Message}");
             return null;
@@ -291,15 +291,7 @@ public partial class MainWindow
 
     private void ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
     {
-        try
-        {
-            Dispatcher.Invoke(() =>
-                MessageBox.Show(this, message, title, buttons, icon));
-        }
-        catch (InvalidOperationException)
-        {
-            // Dispatcher unavailable (e.g., test context) — silently skip UI notification
-        }
+        MessageBox.Show(this, message, title, buttons, icon);
     }
 
     private void ShowError(string message)

@@ -41,6 +41,21 @@ public class BatchFileGeneratorTests
         Assert.Equal("Monkey Island CD.bat", result);
     }
 
+    [Theory]
+    [InlineData("Game & Watch", "Game  Watch.bat")]
+    [InlineData("Foo ^ Bar", "Foo  Bar.bat")]
+    [InlineData("100% Game", "100 Game.bat")]
+    [InlineData("Hello! World", "Hello World.bat")]
+    [InlineData("A | B", "A  B.bat")]
+    [InlineData("Left < Right", "Left  Right.bat")]
+    [InlineData("One > Two", "One  Two.bat")]
+    [InlineData("A&B^C%D!E|F<G>H", "ABCDEFGH.bat")]
+    public void GenerateBatchFileNameStripsBatchProblematicChars(string input, string expected)
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName(input);
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void GenerateSimpleScummVmContentReturnsJustGameId()
     {

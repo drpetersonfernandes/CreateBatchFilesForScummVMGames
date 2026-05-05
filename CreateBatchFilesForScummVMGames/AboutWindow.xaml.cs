@@ -29,6 +29,7 @@ public partial class AboutWindow
         try
         {
             Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
         }
         catch (Exception ex)
         {
@@ -40,10 +41,6 @@ public partial class AboutWindow
 
             // Notify user
             MessageBox.Show(this, $"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            e.Handled = true;
         }
     }
 }

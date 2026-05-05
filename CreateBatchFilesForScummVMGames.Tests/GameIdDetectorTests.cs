@@ -29,7 +29,7 @@ public class GameIdDetectorTests
     [InlineData("game id 'monkey2'")]
     [InlineData("game Id 'monkey2'")]
     [InlineData("game iD 'monkey2'")]
-    public void Pattern1MatchesGameIdWithCaseInsensitiveId(string input)
+    public void Pattern1MatchesWhenIdKeywordIsMixedCase(string input)
     {
         var fullOutput = $"ScummVM 2.9.0\n{input}\nGame detected!";
         var result = Services.GameIdDetector.DetectFromOutput(fullOutput);

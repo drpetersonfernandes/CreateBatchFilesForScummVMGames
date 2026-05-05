@@ -1,9 +1,13 @@
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace CreateBatchFilesForScummVMGames.Services;
 
-public static class BatchFileGenerator
+public static partial class BatchFileGenerator
 {
+    [GeneratedRegex("[&|<>^%!]")]
+    private static partial Regex BatchFileNameInvalidChars();
+
     public static string GenerateBatchFileContent(string scummvmExePath, string gameDirectory)
     {
         return $"\"{scummvmExePath}\" -p \"{gameDirectory}\" --auto-detect --fullscreen";
@@ -11,7 +15,8 @@ public static class BatchFileGenerator
 
     public static string GenerateBatchFileName(string gameFolderName)
     {
-        return $"{gameFolderName}.bat";
+        var sanitized = BatchFileNameInvalidChars().Replace(gameFolderName, "");
+        return $"{sanitized}.bat";
     }
 
     public static string GenerateSimpleScummVmContent(string gameId)

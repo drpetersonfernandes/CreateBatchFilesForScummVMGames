@@ -18,7 +18,7 @@
 
         <StackPanel Grid.Row="1" Margin="20,10,20,10">
             <TextBlock Style="{StaticResource HeadingTextBlockStyle}" Text="Batch File Creator for ScummVM Games" ToolTip="Application name"/>
-            <TextBlock x:Name="AppVersionTextBlock" Margin="0,5,0,0" Text="Version: 1.2.0.0" TextAlignment="Center" ToolTip="Current application version"/>
+            <TextBlock x:Name="AppVersionTextBlock" Margin="0,5,0,0" Text="Version: 1.2.1.0" TextAlignment="Center" ToolTip="Current application version"/>
             <TextBlock x:Name="DescriptionTextBlock" TextWrapping="Wrap" Margin="0,25,0,0" Text="A simple utility to create batch files for launching your ScummVM games." ToolTip="Brief description of this utility"/>
             <TextBlock Margin="0,15,0,0" ToolTip="Visit the official website">
                 <Hyperlink NavigateUri="https://www.purelogiccode.com" RequestNavigate="Hyperlink_RequestNavigate" ToolTip="Open https://www.purelogiccode.com in your web browser">https://www.purelogiccode.com</Hyperlink>
