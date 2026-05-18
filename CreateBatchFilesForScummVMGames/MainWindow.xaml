@@ -65,15 +65,33 @@
                 <Button x:Name="BrowseFolderButton" Grid.Column="2" Content="Browse" Click="BrowseFolderButton_Click" Padding="10,5" ToolTip="Browse for the folder containing your games"/>
             </Grid>
             
-            <!-- Create Batch Files Button -->
-            <Button x:Name="CreateBatchFilesButton" Grid.Row="2" Content="Create Batch Files" Click="CreateBatchFilesButton_ClickAsync" 
-                    Style="{StaticResource PrimaryButtonStyle}" Margin="10,10,10,5" HorizontalAlignment="Center"
-                    ToolTip="Generate batch files and optional .scummvm files for each game subfolder found"/>
+            <!-- Create / Cancel Buttons -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10,10,10,5">
+                <Button x:Name="CreateBatchFilesButton" Content="Create Files" Click="CreateBatchFilesButton_ClickAsync" 
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        ToolTip="Generate the selected file type for each game folder found"/>
+                <Button x:Name="CancelButton" Content="Cancel" Click="CancelButton_Click"
+                        Visibility="Collapsed" Margin="10,0,0,0" Padding="20,10"
+                        ToolTip="Stop the current operation"/>
+            </StackPanel>
             
-            <!-- ScummVM Checkbox -->
-            <CheckBox x:Name="CreateScummVmCheckBox" Grid.Row="3" Content="Also create .scummvm files (auto-detect game IDs)"
-                      Margin="10,0,10,15" HorizontalAlignment="Center" IsChecked="False"
-                      ToolTip="When enabled, .scummvm files are created alongside batch files with auto-detected game IDs"/>
+            <!-- Output Format Selection -->
+            <GroupBox Grid.Row="3" Header="Output Format" Margin="10,5,10,5" HorizontalAlignment="Center"
+                      ToolTip="Choose the type of file to generate for each game folder">
+                <StackPanel>
+                    <RadioButton x:Name="CreateBatRadioButton" Content="Create batch (.bat) files"
+                                 IsChecked="True" Margin="0,2,0,2"
+                                 ToolTip="Generates a .bat file that launches ScummVM with this game"/>
+                    <RadioButton x:Name="CreateSimpleScummVmRadioButton" 
+                                 Content="Create simple .scummvm files (&lt;gameId&gt;.scummvm)"
+                                 Margin="0,2,0,2"
+                                 ToolTip="Generates a .scummvm file containing just the game ID"/>
+                    <RadioButton x:Name="CreateRocknixScummVmRadioButton" 
+                                 Content="Create Rocknix .scummvm files (&lt;folder&gt; (&lt;gameId&gt;).scummvm)"
+                                 Margin="0,2,0,2"
+                                 ToolTip="Generates a .scummvm file with path and game ID (Rocknix/RetroArch format)"/>
+                </StackPanel>
+            </GroupBox>
             
             <!-- Log TextBox -->
             <TextBox x:Name="LogTextBox"

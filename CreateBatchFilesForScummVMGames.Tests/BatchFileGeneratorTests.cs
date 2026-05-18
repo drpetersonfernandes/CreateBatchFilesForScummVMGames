@@ -31,7 +31,7 @@ public class BatchFileGeneratorTests
     public void GenerateBatchFileNameAppendsBatExtension()
     {
         var result = BatchFileGenerator.GenerateBatchFileName("monkey");
-        Assert.Equal("monkey.bat", result);
+        Assert.Equal("Monkey.bat", result);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public class BatchFileGeneratorTests
     public void GenerateSimpleScummVmFileNameCorrectFormat()
     {
         var result = BatchFileGenerator.GenerateSimpleScummVmFileName("monkey");
-        Assert.Equal("monkey.scummvm", result);
+        Assert.Equal("Monkey.scummvm", result);
     }
 
     [Fact]
@@ -97,14 +97,14 @@ public class BatchFileGeneratorTests
     public void GenerateRocknixScummVmFileNameCorrectFormat()
     {
         var result = BatchFileGenerator.GenerateRocknixScummVmFileName("Monkey Island CD", "monkey");
-        Assert.Equal("Monkey Island CD (monkey).scummvm", result);
+        Assert.Equal("Monkey Island CD (Monkey).scummvm", result);
     }
 
     [Fact]
     public void GenerateRocknixScummVmFileNameHandlesSimpleNames()
     {
         var result = BatchFileGenerator.GenerateRocknixScummVmFileName("monkey", "monkey");
-        Assert.Equal("monkey (monkey).scummvm", result);
+        Assert.Equal("Monkey (Monkey).scummvm", result);
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class BatchFileGeneratorTests
         {
             Directory.CreateDirectory(gameDir);
 
-            var path = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir, @"C:\ScummVM\scummvm.exe");
+            var path = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir, @"C:\ScummVM\scummvm.exe", "TestGame");
 
             Assert.True(File.Exists(path));
             Assert.Equal(Path.Combine(tempRoot, "TestGame.bat"), path);
@@ -154,7 +154,7 @@ public class BatchFileGeneratorTests
         {
             Directory.CreateDirectory(gameDir);
 
-            var path = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir, @"C:\Program Files\ScummVM\scummvm.exe");
+            var path = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir, @"C:\Program Files\ScummVM\scummvm.exe", "My Game Folder");
 
             Assert.True(File.Exists(path));
             Assert.Equal(Path.Combine(tempRoot, "My Game Folder.bat"), path);
@@ -177,7 +177,7 @@ public class BatchFileGeneratorTests
         {
             Directory.CreateDirectory(gameDir);
 
-            var path = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir, "scummvm.exe");
+            var path = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir, "scummvm.exe", "MonkeyIsland");
 
             Assert.Equal(Path.Combine(tempRoot, "MonkeyIsland.bat"), path);
         }
@@ -201,8 +201,8 @@ public class BatchFileGeneratorTests
 
             Assert.True(File.Exists(simplePath));
             Assert.True(File.Exists(rocknixPath));
-            Assert.Equal(Path.Combine(tempRoot, "monkey.scummvm"), simplePath);
-            Assert.Equal(Path.Combine(tempRoot, "Monkey Island (monkey).scummvm"), rocknixPath);
+            Assert.Equal(Path.Combine(tempRoot, "Monkey.scummvm"), simplePath);
+            Assert.Equal(Path.Combine(tempRoot, "Monkey Island (Monkey).scummvm"), rocknixPath);
         }
         finally
         {
@@ -266,8 +266,8 @@ public class BatchFileGeneratorTests
 
             Assert.True(File.Exists(simplePath));
             Assert.True(File.Exists(rocknixPath));
-            Assert.Equal("comi-win.scummvm", Path.GetFileName(simplePath));
-            Assert.Equal("CoMI (comi-win).scummvm", Path.GetFileName(rocknixPath));
+            Assert.Equal("Comi-Win.scummvm", Path.GetFileName(simplePath));
+            Assert.Equal("CoMI (Comi-Win).scummvm", Path.GetFileName(rocknixPath));
         }
         finally
         {
@@ -287,8 +287,8 @@ public class BatchFileGeneratorTests
             Directory.CreateDirectory(gameDir1);
             Directory.CreateDirectory(gameDir2);
 
-            var path1 = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir1, "scummvm.exe");
-            var path2 = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir2, "scummvm.exe");
+            var path1 = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir1, "scummvm.exe", "GameA");
+            var path2 = BatchFileGenerator.WriteBatchFile(tempRoot, gameDir2, "scummvm.exe", "GameB");
 
             Assert.True(File.Exists(path1));
             Assert.True(File.Exists(path2));
@@ -300,5 +300,103 @@ public class BatchFileGeneratorTests
         {
             if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
         }
+    }
+
+    [Fact]
+    public void WriteSimpleScummVmFileCreatesFileWithGameId()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+
+            var path = BatchFileGenerator.WriteSimpleScummVmFile(tempRoot, "monkey");
+
+            Assert.True(File.Exists(path));
+            Assert.Equal(Path.Combine(tempRoot, "Monkey.scummvm"), path);
+            Assert.Equal("monkey", File.ReadAllText(path));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void WriteSimpleScummVmFileCapitalizesGameId()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+
+            var path = BatchFileGenerator.WriteSimpleScummVmFile(tempRoot, "comi-win");
+
+            Assert.Equal(Path.Combine(tempRoot, "Comi-Win.scummvm"), path);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void WriteRocknixScummVmFileCreatesFileWithPathAndGameId()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var gameDir = Path.Combine(tempRoot, "Monkey Island");
+
+        try
+        {
+            Directory.CreateDirectory(gameDir);
+
+            var path = BatchFileGenerator.WriteRocknixScummVmFile(tempRoot, "Monkey Island", gameDir, "monkey");
+
+            Assert.True(File.Exists(path));
+            Assert.Equal(Path.Combine(tempRoot, "Monkey Island (Monkey).scummvm"), path);
+            var content = File.ReadAllText(path);
+            Assert.Contains($"--path=\"{gameDir}\"", content);
+            Assert.Contains(" monkey", content);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void WriteRocknixScummVmFileCapitalizesDisplayName()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var gameDir = Path.Combine(tempRoot, "monkey island");
+
+        try
+        {
+            Directory.CreateDirectory(gameDir);
+
+            var path = BatchFileGenerator.WriteRocknixScummVmFile(tempRoot, "monkey island", gameDir, "monkey");
+
+            Assert.Equal(Path.Combine(tempRoot, "Monkey Island (Monkey).scummvm"), path);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameCapitalizesAllWords()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName("adventure (monkey island)");
+        Assert.Equal("Adventure (Monkey Island).bat", result);
+    }
+
+    [Fact]
+    public void GenerateSimpleScummVmFileNameCapitalizesHyphenatedId()
+    {
+        var result = BatchFileGenerator.GenerateSimpleScummVmFileName("comi-win");
+        Assert.Equal("Comi-Win.scummvm", result);
     }
 }

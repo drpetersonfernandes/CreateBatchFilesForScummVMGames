@@ -4,6 +4,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Input;
 using CreateBatchFilesForScummVMGames.Services;
 using Microsoft.Win32;
 
@@ -11,6 +12,8 @@ namespace CreateBatchFilesForScummVMGames;
 
 public partial class MainWindow
 {
+    private CancellationTokenSource? _cts;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -111,19 +114,47 @@ public partial class MainWindow
 
             try
             {
-                CreateBatchFilesForScummVmGames(rootFolder, scummvmExePath);
+                var outputFormat = CreateBatRadioButton.IsChecked == true ? "bat"
+                    : CreateSimpleScummVmRadioButton.IsChecked == true ? "simple"
+                    : CreateRocknixScummVmRadioButton.IsChecked == true ? "rocknix"
+                    : "bat";
+
+                CreateBatchFilesButton.IsEnabled = false;
+                CreateBatchFilesButton.Content = "Processing...";
+                CancelButton.Visibility = Visibility.Visible;
+                Mouse.OverrideCursor = Cursors.Wait;
+
+                _cts = new CancellationTokenSource();
+                var ct = _cts.Token;
+
+                await Task.Run(() => CreateBatchFilesForScummVmGames(rootFolder, scummvmExePath, outputFormat, ct), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                LogMessage("");
+                LogMessage("Process cancelled by user.");
+                UpdateStatusBarMessage("Cancelled.");
             }
             catch (Exception ex)
             {
-                LogMessage($"Error creating batch files: {ex.Message}");
-                ShowError($"An error occurred while creating batch files: {ex.Message}");
-                await ReportBugAsync("Error creating batch files", ex);
+                LogMessage($"Error creating files: {ex.Message}");
+                ShowError($"An error occurred while creating files: {ex.Message}");
+                await ReportBugAsync("Error creating files", ex);
                 UpdateStatusBarMessage("Process failed with an error.");
+            }
+            finally
+            {
+                _cts?.Dispose();
+                _cts = null;
+                CreateBatchFilesButton.IsEnabled = true;
+                CreateBatchFilesButton.Content = "Create Files";
+                CancelButton.Visibility = Visibility.Collapsed;
+                Mouse.OverrideCursor = null;
             }
         }
         catch (Exception ex)
         {
-            await ReportBugAsync("Error creating batch files", ex);
+            await ReportBugAsync("Error creating files", ex);
             UpdateStatusBarMessage("An unexpected error occurred.");
         }
     }
@@ -150,92 +181,147 @@ public partial class MainWindow
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
-    internal void CreateBatchFilesForScummVmGames(string rootFolder, string scummvmExePath, bool createScummVm)
+    private static List<string> GetGameFolderCandidates(string rootFolder)
+    {
+        var result = new List<string>();
+
+        foreach (var firstLevelDir in Directory.EnumerateDirectories(rootFolder))
+        {
+            var gameFolder = FindGameFolder(firstLevelDir);
+            if (gameFolder != null)
+                result.Add(gameFolder);
+        }
+
+        return result;
+    }
+
+    private static string? FindGameFolder(string directory)
+    {
+        if (Directory.EnumerateFiles(directory).Any())
+            return directory;
+
+        foreach (var subDir in Directory.EnumerateDirectories(directory))
+        {
+            var result = FindGameFolder(subDir);
+            if (result != null)
+                return result;
+        }
+
+        return null;
+    }
+
+    private static string GetGameDisplayName(string rootFolder, string gameDirectory)
+    {
+        var relativePath = Path.GetRelativePath(rootFolder, gameDirectory);
+        var lastSep = relativePath.LastIndexOf(Path.DirectorySeparatorChar);
+        if (lastSep < 0)
+            return relativePath;
+
+        var parent = relativePath[..lastSep].Replace(Path.DirectorySeparatorChar, '-');
+        var folder = relativePath[(lastSep + 1)..];
+        return $"{parent} ({folder})";
+    }
+
+    internal void CreateBatchFilesForScummVmGames(string rootFolder, string scummvmExePath, string outputFormat, CancellationToken ct)
     {
         try
         {
-            var gameDirectories = Directory.GetDirectories(rootFolder);
+            var gameDirectories = GetGameFolderCandidates(rootFolder);
             var filesCreated = 0;
 
             LogMessage("");
-            LogMessage("Starting batch file creation process...");
-            UpdateStatusBarMessage("Creating batch files...");
+            LogMessage("Scanning for game folders (top-down)...");
+            UpdateStatusBarMessage("Creating files...");
 
-            if (createScummVm)
-            {
-                LogMessage("ScummVM file creation is also enabled. Auto-detecting game IDs...");
-            }
+            LogMessage($"Found {gameDirectories.Count} game folder(s).");
+            LogMessage("Validating with ScummVM detection...");
 
-            foreach (var gameDirectory in gameDirectories)
+            for (var i = 0; i < gameDirectories.Count; i++)
             {
+                if (ct.IsCancellationRequested)
+                {
+                    LogMessage("");
+                    LogMessage("Process cancelled by user.");
+                    UpdateStatusBarMessage("Cancelled.");
+                    return;
+                }
+
+                var gameDirectory = gameDirectories[i];
+
                 try
                 {
-                    var gameFolderName = Path.GetFileName(gameDirectory);
-                    var batchFilePath = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath);
-                    LogMessage($"Batch file created: {batchFilePath}");
+                    var displayName = GetGameDisplayName(rootFolder, gameDirectory);
 
-                    filesCreated++;
+                    UpdateStatusBarMessage($"Validating... ({i + 1}/{gameDirectories.Count})");
 
-                    if (createScummVm)
+                    var gameId = DetectGameId(scummvmExePath, gameDirectory, displayName);
+
+                    if (ct.IsCancellationRequested)
                     {
-                        var gameId = DetectGameId(scummvmExePath, gameDirectory, gameFolderName);
-                        if (!string.IsNullOrEmpty(gameId))
-                        {
-                            try
-                            {
-                                CreateScummVmFiles(rootFolder, gameFolderName, gameDirectory, gameId);
-                            }
-                            catch (Exception ex)
-                            {
-                                LogMessage($"  Warning: Could not create .scummvm file for {gameFolderName}: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            LogMessage($"  Warning: Could not detect game ID for {gameFolderName}. Skipping .scummvm file.");
-                            LogMessage("  Verify the game data is valid in ScummVM's 'Add Game' dialog.");
-                        }
+                        LogMessage("");
+                        LogMessage("Process cancelled by user.");
+                        UpdateStatusBarMessage("Cancelled.");
+                        return;
+                    }
+
+                    if (outputFormat == "bat")
+                    {
+                        var batchFilePath = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath, displayName);
+                        LogMessage($"File created: {batchFilePath}");
+                        filesCreated++;
+
+                        if (string.IsNullOrEmpty(gameId))
+                            LogMessage("  Note: ScummVM could not auto-detect this game. The batch file will use --auto-detect at launch.");
+                    }
+                    else if (!string.IsNullOrEmpty(gameId))
+                    {
+                        var filePath = outputFormat == "simple"
+                            ? BatchFileGenerator.WriteSimpleScummVmFile(rootFolder, gameId)
+                            : BatchFileGenerator.WriteRocknixScummVmFile(rootFolder, displayName, gameDirectory, gameId);
+
+                        LogMessage($"File created: {filePath}");
+                        filesCreated++;
+                    }
+                    else
+                    {
+                        LogMessage($"Skipped (game ID required for .scummvm): {displayName}");
+                        LogMessage("  Verify the game data is valid in ScummVM's 'Add Game' dialog.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    LogMessage($"Error creating batch file for {gameDirectory}: {ex.Message}");
-                    _ = ReportBugAsync($"Error creating batch file for {Path.GetFileName(gameDirectory)}", ex);
+                    LogMessage($"Error creating file for {gameDirectory}: {ex.Message}");
+                    _ = ReportBugAsync($"Error creating file for {Path.GetFileName(gameDirectory)}", ex);
                 }
             }
 
             if (filesCreated > 0)
             {
                 LogMessage("");
-                LogMessage($"{filesCreated} batch files have been successfully created.");
+                LogMessage($"{filesCreated} files have been successfully created.");
                 LogMessage("They are located in the root folder of your ScummVM games.");
-                UpdateStatusBarMessage($"{filesCreated} batch files created successfully.");
+                UpdateStatusBarMessage($"{filesCreated} files created successfully.");
 
-                ShowMessageBox($"{filesCreated} batch files have been successfully created.\n\n" +
+                ShowMessageBox($"{filesCreated} files have been successfully created.\n\n" +
                                "They are located in the root folder of your ScummVM games.",
                     "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                LogMessage("No game folders found. No batch files were created.");
-                ShowError("No game folders found. No batch files were created.");
+                LogMessage("No ScummVM game folders found. No files were created.");
+                ShowError("No ScummVM game folders found. No files were created.");
                 UpdateStatusBarMessage("No game folders found. No files were created.");
                 _ = ReportBugAsync("No game folders found",
-                    new DirectoryNotFoundException("No subdirectories found in the game folder"));
+                    new DirectoryNotFoundException("No valid ScummVM game directories were found in the game folder"));
             }
         }
         catch (Exception ex)
         {
             LogMessage($"Error accessing folder structure: {ex.Message}");
             UpdateStatusBarMessage("Error accessing folder structure.");
-            _ = ReportBugAsync("Error accessing folder structure during batch file creation", ex);
+            _ = ReportBugAsync("Error accessing folder structure during file creation", ex);
             throw;
         }
-    }
-
-    private void CreateBatchFilesForScummVmGames(string rootFolder, string scummvmExePath)
-    {
-        CreateBatchFilesForScummVmGames(rootFolder, scummvmExePath, CreateScummVmCheckBox.IsChecked == true);
     }
 
     internal string? DetectGameId(string scummvmExePath, string gameDirectory, string gameFolderName)
@@ -253,26 +339,32 @@ public partial class MainWindow
                 CreateNoWindow = true
             };
 
+            var outputBuilder = new StringBuilder();
+            var errorBuilder = new StringBuilder();
+            process.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data != null) outputBuilder.AppendLine(e.Data);
+            };
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data != null) errorBuilder.AppendLine(e.Data);
+            };
+
             process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
 
             if (!process.WaitForExit(15000))
             {
                 if (!process.HasExited)
-                {
                     process.Kill();
-                }
 
                 LogMessage($"  Warning: Game ID detection timed out for {gameFolderName}");
-                var partialOutput = process.StandardOutput.ReadToEnd();
-                var partialError = process.StandardError.ReadToEnd();
-                var partialCombined = partialOutput + "\n" + partialError;
-                return GameIdDetector.DetectFromOutput(partialCombined);
             }
 
-            var output = process.StandardOutput.ReadToEnd();
-            var error = process.StandardError.ReadToEnd();
-            var combined = output + "\n" + error;
+            process.WaitForExit();
 
+            var combined = outputBuilder + "\n" + errorBuilder;
             return GameIdDetector.DetectFromOutput(combined);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -282,16 +374,12 @@ public partial class MainWindow
         }
     }
 
-    internal void CreateScummVmFiles(string rootFolder, string gameFolderName, string gameDirectory, string gameId)
-    {
-        var (simplePath, rocknixPath) = BatchFileGenerator.WriteScummVmFiles(rootFolder, gameFolderName, gameDirectory, gameId);
-        LogMessage($"  .scummvm file created (simple): {simplePath}");
-        LogMessage($"  .scummvm file created (Rocknix): {rocknixPath}");
-    }
-
     private void ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
     {
-        MessageBox.Show(this, message, title, buttons, icon);
+        if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+            Application.Current.Dispatcher.Invoke(() => MessageBox.Show(this, message, title, buttons, icon));
+        else
+            MessageBox.Show(this, message, title, buttons, icon);
     }
 
     private void ShowError(string message)
@@ -370,6 +458,13 @@ public partial class MainWindow
         {
             // Silently fail if error reporting itself fails
         }
+    }
+
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        _cts?.Cancel();
+        CancelButton.IsEnabled = false;
+        CancelButton.Content = "Cancelling...";
     }
 
     private void ExitMenuItem_Click(object sender, RoutedEventArgs e)

@@ -17,7 +17,64 @@ public class MainWindowTests : IDisposable
     {
         var dir = Path.Combine(_tempRoot, name);
         Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, ".gamefile"), string.Empty);
         return dir;
+    }
+
+    private void CreateNestedGameDir(string parentName, string gameName)
+    {
+        var parentDir = Path.Combine(_tempRoot, parentName);
+        var gameDir = Path.Combine(parentDir, gameName);
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, ".gamefile"), string.Empty);
+    }
+
+    private void CreateEmptyLeafDir(string parentName, string emptyName)
+    {
+        var parentDir = string.IsNullOrEmpty(parentName) ? _tempRoot : Path.Combine(_tempRoot, parentName);
+        var emptyDir = Path.Combine(parentDir, emptyName);
+        Directory.CreateDirectory(emptyDir);
+    }
+
+    private static string GetGameDisplayName(string rootFolder, string gameDirectory)
+    {
+        var relativePath = Path.GetRelativePath(rootFolder, gameDirectory);
+        var lastSep = relativePath.LastIndexOf(Path.DirectorySeparatorChar);
+        if (lastSep < 0)
+            return relativePath;
+
+        var parent = relativePath[..lastSep].Replace(Path.DirectorySeparatorChar, '-');
+        var folder = relativePath[(lastSep + 1)..];
+        return $"{parent} ({folder})";
+    }
+
+    private static List<string> GetGameFolderCandidates(string rootFolder)
+    {
+        var result = new List<string>();
+
+        foreach (var firstLevelDir in Directory.EnumerateDirectories(rootFolder))
+        {
+            var gameFolder = FindGameFolder(firstLevelDir);
+            if (gameFolder != null)
+                result.Add(gameFolder);
+        }
+
+        return result;
+    }
+
+    private static string? FindGameFolder(string directory)
+    {
+        if (Directory.EnumerateFiles(directory).Any())
+            return directory;
+
+        foreach (var subDir in Directory.EnumerateDirectories(directory))
+        {
+            var result = FindGameFolder(subDir);
+            if (result != null)
+                return result;
+        }
+
+        return null;
     }
 
     private static List<string> SimulateBatchFileCreation(string rootFolder, string scummvmExePath)
@@ -25,37 +82,53 @@ public class MainWindowTests : IDisposable
         if (!Directory.Exists(rootFolder))
             Directory.CreateDirectory(rootFolder);
 
-        var gameDirectories = Directory.GetDirectories(rootFolder);
+        var gameDirectories = GetGameFolderCandidates(rootFolder);
         var createdFiles = new List<string>();
 
         foreach (var gameDirectory in gameDirectories)
         {
-            var path = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath);
+            var displayName = GetGameDisplayName(rootFolder, gameDirectory);
+            var path = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath, displayName);
             createdFiles.Add(path);
         }
 
         return createdFiles;
     }
 
-    private static List<string> SimulateScummVmCreation(string rootFolder, string scummvmExePath)
+    private static List<string> SimulateSimpleScummVmCreation(string rootFolder)
     {
         if (!Directory.Exists(rootFolder))
             Directory.CreateDirectory(rootFolder);
 
-        var gameDirectories = Directory.GetDirectories(rootFolder);
+        var gameDirectories = GetGameFolderCandidates(rootFolder);
         var createdFiles = new List<string>();
 
         foreach (var gameDirectory in gameDirectories)
         {
             var gameFolderName = Path.GetFileName(gameDirectory);
             var gameId = "detected-" + gameFolderName.ToLowerInvariant().Replace(" ", "-");
+            var path = BatchFileGenerator.WriteSimpleScummVmFile(rootFolder, gameId);
+            createdFiles.Add(path);
+        }
 
-            var batchPath = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath);
-            createdFiles.Add(batchPath);
+        return createdFiles;
+    }
 
-            var (simplePath, rocknixPath) = BatchFileGenerator.WriteScummVmFiles(rootFolder, gameFolderName, gameDirectory, gameId);
-            createdFiles.Add(simplePath);
-            createdFiles.Add(rocknixPath);
+    private static List<string> SimulateRocknixScummVmCreation(string rootFolder)
+    {
+        if (!Directory.Exists(rootFolder))
+            Directory.CreateDirectory(rootFolder);
+
+        var gameDirectories = GetGameFolderCandidates(rootFolder);
+        var createdFiles = new List<string>();
+
+        foreach (var gameDirectory in gameDirectories)
+        {
+            var displayName = GetGameDisplayName(rootFolder, gameDirectory);
+            var gameFolderName = Path.GetFileName(gameDirectory);
+            var gameId = "detected-" + gameFolderName.ToLowerInvariant().Replace(" ", "-");
+            var path = BatchFileGenerator.WriteRocknixScummVmFile(rootFolder, displayName, gameDirectory, gameId);
+            createdFiles.Add(path);
         }
 
         return createdFiles;
@@ -86,21 +159,6 @@ public class MainWindowTests : IDisposable
         var batchFile = Path.Combine(_tempRoot, "MonkeyIsland.bat");
         var content = File.ReadAllText(batchFile);
         Assert.Contains($"\"C:\\ScummVM\\scummvm.exe\" -p \"{gameDir}\" --auto-detect --fullscreen", content);
-    }
-
-    [Fact]
-    public void BatchCreationIntegrationHandlesSpacesInPaths()
-    {
-        CreateGameDir("Monkey Island CD");
-
-        SimulateBatchFileCreation(_tempRoot, @"C:\Program Files\ScummVM\scummvm.exe");
-
-        var batchFile = Path.Combine(_tempRoot, "Monkey Island CD.bat");
-        Assert.True(File.Exists(batchFile));
-
-        var content = File.ReadAllText(batchFile);
-        Assert.Contains("\"C:\\Program Files\\ScummVM\\scummvm.exe\"", content);
-        Assert.Contains("Monkey Island CD", content);
     }
 
     [Fact]
@@ -138,53 +196,6 @@ public class MainWindowTests : IDisposable
     }
 
     [Fact]
-    public void ScummVmCreationIntegrationCreatesBothSimpleAndRocknixFiles()
-    {
-        CreateGameDir("Monkey Island");
-
-        var files = SimulateScummVmCreation(_tempRoot, "scummvm.exe");
-
-        Assert.Contains(Path.Combine(_tempRoot, "detected-monkey-island.scummvm"), files);
-        Assert.Contains(Path.Combine(_tempRoot, "Monkey Island (detected-monkey-island).scummvm"), files);
-        Assert.True(File.Exists(Path.Combine(_tempRoot, "detected-monkey-island.scummvm")));
-        Assert.True(File.Exists(Path.Combine(_tempRoot, "Monkey Island (detected-monkey-island).scummvm")));
-    }
-
-    [Fact]
-    public void ScummVmCreationIntegrationSimpleFileContainsGameId()
-    {
-        CreateGameDir("Monkey Island");
-
-        SimulateScummVmCreation(_tempRoot, "scummvm.exe");
-
-        var content = File.ReadAllText(Path.Combine(_tempRoot, "detected-monkey-island.scummvm"));
-        Assert.Equal("detected-monkey-island", content);
-    }
-
-    [Fact]
-    public void ScummVmCreationIntegrationRocknixFileContainsQuotedPathAndGameId()
-    {
-        var gameDir = CreateGameDir("Monkey Island");
-        const string gameId = "detected-monkey-island";
-
-        SimulateScummVmCreation(_tempRoot, "scummvm.exe");
-
-        var content = File.ReadAllText(Path.Combine(_tempRoot, $"Monkey Island ({gameId}).scummvm"));
-        Assert.Contains($"--path=\"{gameDir}\" {gameId}", content);
-    }
-
-    [Fact]
-    public void ScummVmCreationIntegrationHandlesHyphenatedGameIds()
-    {
-        CreateGameDir("CoMI");
-
-        SimulateScummVmCreation(_tempRoot, "scummvm.exe");
-
-        Assert.True(File.Exists(Path.Combine(_tempRoot, "detected-comi.scummvm")));
-        Assert.True(File.Exists(Path.Combine(_tempRoot, "CoMI (detected-comi).scummvm")));
-    }
-
-    [Fact]
     public void BatchCreationIntegrationCorrectContentForEachGame()
     {
         var gameDir1 = CreateGameDir("Monkey Island");
@@ -200,7 +211,7 @@ public class MainWindowTests : IDisposable
     }
 
     [Fact]
-    public void BatchCreationIntegrationDoesNotCreateScummVmFilesWhenDisabled()
+    public void BatchCreationIntegrationDoesNotCreateScummVmFilesWhenBatSelected()
     {
         CreateGameDir("MonkeyIsland");
 
@@ -208,17 +219,6 @@ public class MainWindowTests : IDisposable
 
         var scummvmFiles = Directory.GetFiles(_tempRoot, "*.scummvm");
         Assert.Empty(scummvmFiles);
-    }
-
-    [Fact]
-    public void ScummVmCreationIntegrationAlsoCreatesBatchFiles()
-    {
-        CreateGameDir("Monkey Island");
-
-        var files = SimulateScummVmCreation(_tempRoot, "scummvm.exe");
-
-        Assert.Contains(Path.Combine(_tempRoot, "Monkey Island.bat"), files);
-        Assert.True(File.Exists(Path.Combine(_tempRoot, "Monkey Island.bat")));
     }
 
     [Fact]
@@ -235,23 +235,227 @@ public class MainWindowTests : IDisposable
     }
 
     [Fact]
-    public void BatchCreationIntegrationGameDirectoriesWithoutFilesAlsoGetBatchFiles()
+    public void NestedGameFoldersAreDiscovered()
     {
-        CreateGameDir("EmptyGameDir");
+        CreateNestedGameDir("adventure", "MonkeyIsland");
+        CreateNestedGameDir("rpg", "DayOfTheTentacle");
+
+        var files = SimulateBatchFileCreation(_tempRoot, @"C:\ScummVM\scummvm.exe");
+
+        Assert.Equal(2, files.Count);
+        Assert.Contains(Path.Combine(_tempRoot, "Adventure (MonkeyIsland).bat"), files);
+        Assert.Contains(Path.Combine(_tempRoot, "Rpg (DayOfTheTentacle).bat"), files);
+    }
+
+    [Fact]
+    public void IntermediateContainersAreNotTreatedAsGames()
+    {
+        var container = Path.Combine(_tempRoot, "adventure");
+        Directory.CreateDirectory(container);
+        CreateNestedGameDir("adventure", "MonkeyIsland");
+
+        var files = SimulateBatchFileCreation(_tempRoot, @"C:\ScummVM\scummvm.exe");
+
+        Assert.Single(files);
+        Assert.Contains("MonkeyIsland", files[0]);
+        Assert.DoesNotContain(files, static f => f.EndsWith("adventure.bat", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EmptyLeafFoldersAreSkipped()
+    {
+        CreateEmptyLeafDir("", "empty");
+        CreateGameDir("MonkeyIsland");
 
         var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
 
         Assert.Single(files);
-        Assert.True(File.Exists(Path.Combine(_tempRoot, "EmptyGameDir.bat")));
+        Assert.Contains("MonkeyIsland", files[0]);
+        Assert.DoesNotContain(files, static f => f.Contains("empty"));
     }
 
     [Fact]
-    public void ScummVmCreationIntegrationThreeFilesPerGameDirectory()
+    public void EmptyNestedLeafFoldersAreSkipped()
+    {
+        CreateEmptyLeafDir("adventure", "empty");
+        CreateNestedGameDir("adventure", "MonkeyIsland");
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Single(files);
+        Assert.Contains("MonkeyIsland", files[0]);
+    }
+
+    [Fact]
+    public void NestedNamingUsesParentInParens()
+    {
+        CreateNestedGameDir("adventure", "Monkey Island");
+
+        var files = SimulateBatchFileCreation(_tempRoot, @"C:\ScummVM\scummvm.exe");
+
+        Assert.Single(files);
+        Assert.Contains(Path.Combine(_tempRoot, "Adventure (Monkey Island).bat"), files);
+        Assert.True(File.Exists(Path.Combine(_tempRoot, "Adventure (Monkey Island).bat")));
+    }
+
+    [Fact]
+    public void CollisionAvoidanceForSameLeafName()
+    {
+        CreateNestedGameDir("scifi", "monkey");
+        CreateNestedGameDir("comedy", "monkey");
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Equal(2, files.Count);
+        Assert.Contains(Path.Combine(_tempRoot, "Scifi (Monkey).bat"), files);
+        Assert.Contains(Path.Combine(_tempRoot, "Comedy (Monkey).bat"), files);
+    }
+
+    [Fact]
+    public void FlatGamesStillUsePlainFolderName()
+    {
+        CreateGameDir("MonkeyIsland");
+        CreateGameDir("FullThrottle");
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Equal(2, files.Count);
+        Assert.Contains(Path.Combine(_tempRoot, "MonkeyIsland.bat"), files);
+        Assert.Contains(Path.Combine(_tempRoot, "FullThrottle.bat"), files);
+    }
+
+    [Fact]
+    public void DeeplyNestedGameFoldersAreDiscovered()
+    {
+        var rpgDir = Path.Combine(_tempRoot, "rpg");
+        var indyDir = Path.Combine(rpgDir, "lucasarts");
+        Directory.CreateDirectory(indyDir);
+        var gameDir = Path.Combine(indyDir, "Indy3");
+        Directory.CreateDirectory(gameDir);
+        File.WriteAllText(Path.Combine(gameDir, ".gamefile"), string.Empty);
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Single(files);
+        Assert.Contains(Path.Combine(_tempRoot, "Rpg-Lucasarts (Indy3).bat"), files);
+    }
+
+    [Fact]
+    public void SimpleScummVmFileContainsGameId()
     {
         CreateGameDir("Monkey Island");
 
-        var files = SimulateScummVmCreation(_tempRoot, "scummvm.exe");
+        var files = SimulateSimpleScummVmCreation(_tempRoot);
 
-        Assert.Equal(3, files.Count);
+        Assert.Single(files);
+        var content = File.ReadAllText(files[0]);
+        Assert.Equal("detected-monkey-island", content);
+    }
+
+    [Fact]
+    public void SimpleScummVmFileNameIsCapitalizedGameId()
+    {
+        CreateGameDir("Monkey Island");
+
+        var files = SimulateSimpleScummVmCreation(_tempRoot);
+
+        Assert.Single(files);
+        Assert.Contains(Path.Combine(_tempRoot, "Detected-Monkey-Island.scummvm"), files);
+    }
+
+    [Fact]
+    public void RocknixScummVmFileContainsQuotedPathAndGameId()
+    {
+        var gameDir = CreateGameDir("Monkey Island");
+
+        var files = SimulateRocknixScummVmCreation(_tempRoot);
+
+        Assert.Single(files);
+        var content = File.ReadAllText(files[0]);
+        Assert.Contains($"--path=\"{gameDir}\" detected-monkey-island", content);
+    }
+
+    [Fact]
+    public void RocknixScummVmFileNameUsesDisplayNameAndGameId()
+    {
+        CreateGameDir("Monkey Island");
+
+        var files = SimulateRocknixScummVmCreation(_tempRoot);
+
+        Assert.Single(files);
+        Assert.Contains(Path.Combine(_tempRoot, "Monkey Island (Detected-Monkey-Island).scummvm"), files);
+    }
+
+    [Fact]
+    public void NestedRocknixScummVmFileNameUsesCapitalizedParentName()
+    {
+        CreateNestedGameDir("adventure", "Monkey Island");
+
+        var files = SimulateRocknixScummVmCreation(_tempRoot);
+
+        Assert.Single(files);
+        Assert.Contains(Path.Combine(_tempRoot, "Adventure (Monkey Island) (Detected-Monkey-Island).scummvm"), files);
+    }
+
+    [Fact]
+    public void BatchCreationCapitalizesAllWordsInFileName()
+    {
+        CreateGameDir("the secret of monkey island");
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Single(files);
+        Assert.Contains(Path.Combine(_tempRoot, "The Secret Of Monkey Island.bat"), files);
+    }
+
+    [Fact]
+    public void RocknixScummVmCreationCreatesExactlyOneFilePerGame()
+    {
+        CreateGameDir("Monkey Island");
+        CreateGameDir("Full Throttle");
+
+        var files = SimulateRocknixScummVmCreation(_tempRoot);
+
+        Assert.Equal(2, files.Count);
+        Assert.All(files, static f => Assert.EndsWith(".scummvm", f));
+    }
+
+    [Fact]
+    public void SimpleScummVmCreationCreatesExactlyOneFilePerGame()
+    {
+        CreateGameDir("Monkey Island");
+        CreateGameDir("Full Throttle");
+
+        var files = SimulateSimpleScummVmCreation(_tempRoot);
+
+        Assert.Equal(2, files.Count);
+        Assert.All(files, static f => Assert.EndsWith(".scummvm", f));
+    }
+
+    [Fact]
+    public void OneGamePerFirstLevelFolder()
+    {
+        CreateNestedGameDir("zork", "data");
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Single(files);
+        Assert.Contains(files, static f => f.EndsWith("Zork (Data).bat", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void StopsAtFirstFolderWithFilesGoingDeep()
+    {
+        var zork = Path.Combine(_tempRoot, "Zork Nemesis (DVD DOS)");
+        var level2 = Path.Combine(zork, "Zork Nemesis (DVD DOS)");
+        var level3 = Path.Combine(level2, "Zork Nemesis (DVD DOS)");
+        Directory.CreateDirectory(level3);
+        File.WriteAllText(Path.Combine(level3, "game.dat"), string.Empty);
+
+        var files = SimulateBatchFileCreation(_tempRoot, "scummvm.exe");
+
+        Assert.Single(files);
+        const string expectedSuffix = "Zork Nemesis (DVD DOS)-Zork Nemesis (DVD DOS) (Zork Nemesis (DVD DOS)).bat";
+        Assert.Contains(files, static f => f.EndsWith(expectedSuffix, StringComparison.Ordinal));
     }
 }
