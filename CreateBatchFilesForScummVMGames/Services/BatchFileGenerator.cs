@@ -72,20 +72,6 @@ public static partial class BatchFileGenerator
         return batchFilePath;
     }
 
-    internal static string WriteSimpleScummVmFile(string rootFolder, string gameId)
-    {
-        var path = Path.Combine(rootFolder, GenerateSimpleScummVmFileName(gameId));
-        File.WriteAllText(path, GenerateSimpleScummVmContent(gameId));
-        return path;
-    }
-
-    internal static string WriteRocknixScummVmFile(string rootFolder, string displayName, string gameDirectory, string gameId)
-    {
-        var path = Path.Combine(rootFolder, GenerateRocknixScummVmFileName(displayName, gameId));
-        File.WriteAllText(path, GenerateRocknixScummVmContent(gameDirectory, gameId));
-        return path;
-    }
-
     internal static (string SimplePath, string RocknixPath) WriteScummVmFiles(string rootFolder, string displayName, string gameDirectory, string gameId)
     {
         var simplePath = Path.Combine(rootFolder, GenerateSimpleScummVmFileName(gameId));
