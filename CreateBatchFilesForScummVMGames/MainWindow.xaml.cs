@@ -13,7 +13,7 @@ namespace CreateBatchFilesForScummVMGames;
 public partial class MainWindow
 {
     private CancellationTokenSource? _cts;
-    private bool _isShuttingDown;
+    private volatile bool _isShuttingDown;
 
     public MainWindow()
     {
@@ -44,12 +44,24 @@ public partial class MainWindow
         Application.Current?.Dispatcher.InvokeAsync(() => { StatusBarMessage.Text = message; });
     }
 
+    private const int MaxLogLines = 5000;
+
     private void LogMessage(string message)
     {
         Application.Current?.Dispatcher.InvokeAsync(() =>
         {
             LogTextBox.AppendText(message + Environment.NewLine);
             LogTextBox.ScrollToEnd();
+
+            if (LogTextBox.LineCount > MaxLogLines)
+            {
+                var excess = LogTextBox.LineCount - MaxLogLines;
+                var sb = new StringBuilder();
+                for (var i = excess; i < LogTextBox.LineCount; i++)
+                    sb.AppendLine(LogTextBox.GetLineText(i));
+                LogTextBox.Text = sb.ToString();
+                LogTextBox.ScrollToEnd();
+            }
         });
     }
 
@@ -304,10 +316,10 @@ public partial class MainWindow
 
     private MessageBoxResult ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
     {
-        if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
-            return Application.Current.Dispatcher.Invoke(() => MessageBox.Show(this, message, title, buttons, icon));
-        else
+        if (Dispatcher.CheckAccess())
             return MessageBox.Show(this, message, title, buttons, icon);
+
+        return Dispatcher.Invoke(() => MessageBox.Show(this, message, title, buttons, icon));
     }
 
     private void ShowError(string message)

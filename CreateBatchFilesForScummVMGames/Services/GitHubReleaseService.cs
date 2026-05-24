@@ -44,7 +44,7 @@ public sealed class GitHubReleaseService : IDisposable
 
             if (string.IsNullOrEmpty(tagName)) return null;
 
-            var latestVersion = StripVPrefix(tagName);
+            var latestVersion = ExtractVersionFromTag(tagName);
             var currentVersion = typeof(App).Assembly.GetName().Version;
 
             if (currentVersion == null) return null;
@@ -65,8 +65,11 @@ public sealed class GitHubReleaseService : IDisposable
         }
     }
 
-    internal static string StripVPrefix(string tagName)
+    internal static string ExtractVersionFromTag(string tagName)
     {
+        if (tagName.StartsWith("release_", StringComparison.OrdinalIgnoreCase))
+            return tagName["release_".Length..];
+
         return tagName.StartsWith('v') ? tagName[1..] : tagName;
     }
 

@@ -81,7 +81,8 @@ public class BugReportService : IDisposable
                 request.Headers.Add("X-API-KEY", _apiKey);
 
                 // Send the request using the static HttpClient
-                await HttpClient.SendAsync(request);
+                using var response = await HttpClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
             }
             finally
             {

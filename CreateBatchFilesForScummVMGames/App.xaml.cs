@@ -23,7 +23,7 @@ public partial class App
     private const string StatsApiUrl = "https://www.purelogiccode.com/ApplicationStats/stats";
     private const string StatsApplicationId = "createbatchfilesforscummvmgames";
 
-    private static bool _isShuttingDown;
+    private static volatile bool _isShuttingDown;
 
     private static Task? _launchTrackingTask;
     private static Task? _updateCheckTask;

@@ -6,23 +6,37 @@ namespace CreateBatchFilesForScummVMGames.Tests;
 public class GitHubReleaseServiceTests
 {
     [Fact]
-    public void StripVPrefix_RemovesLeadingV()
+    public void ExtractVersionFromTag_StripsReleasePrefix()
     {
-        var result = GitHubReleaseService.StripVPrefix("v1.2.3");
+        var result = GitHubReleaseService.ExtractVersionFromTag("release_1.2.1");
+        Assert.Equal("1.2.1", result);
+    }
+
+    [Fact]
+    public void ExtractVersionFromTag_StripsReleasePrefixCaseInsensitive()
+    {
+        var result = GitHubReleaseService.ExtractVersionFromTag("Release_2.0.0");
+        Assert.Equal("2.0.0", result);
+    }
+
+    [Fact]
+    public void ExtractVersionFromTag_RemovesLeadingV()
+    {
+        var result = GitHubReleaseService.ExtractVersionFromTag("v1.2.3");
         Assert.Equal("1.2.3", result);
     }
 
     [Fact]
-    public void StripVPrefix_ReturnsSameStringWhenNoLeadingV()
+    public void ExtractVersionFromTag_ReturnsSameStringWhenNoPrefix()
     {
-        var result = GitHubReleaseService.StripVPrefix("1.2.3");
+        var result = GitHubReleaseService.ExtractVersionFromTag("1.2.3");
         Assert.Equal("1.2.3", result);
     }
 
     [Fact]
-    public void StripVPrefix_HandlesEmptyString()
+    public void ExtractVersionFromTag_HandlesEmptyString()
     {
-        var result = GitHubReleaseService.StripVPrefix("");
+        var result = GitHubReleaseService.ExtractVersionFromTag("");
         Assert.Equal("", result);
     }
 

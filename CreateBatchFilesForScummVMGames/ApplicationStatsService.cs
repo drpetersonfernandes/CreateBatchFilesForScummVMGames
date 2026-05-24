@@ -39,9 +39,10 @@ public class ApplicationStatsService : IDisposable
 
             using var request = new HttpRequestMessage(HttpMethod.Post, _statsApiUrl);
             request.Content = JsonContent.Create(payload);
-            request.Headers.Add("Authorization", $"Bearer {_statsApiKey}");
+            request.Headers.Add("X-API-KEY", _statsApiKey);
 
-            await HttpClient.SendAsync(request);
+            using var response = await HttpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
         }
         catch (Exception ex)
         {

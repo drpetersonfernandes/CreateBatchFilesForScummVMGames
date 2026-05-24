@@ -18,13 +18,16 @@
 
         <StackPanel Grid.Row="1" Margin="20,10,20,10">
             <TextBlock Style="{StaticResource HeadingTextBlockStyle}" Text="Batch File Creator for ScummVM Games" ToolTip="Application name"/>
-            <TextBlock x:Name="AppVersionTextBlock" Margin="0,5,0,0" Text="Version: 1.2.1.0" TextAlignment="Center" ToolTip="Current application version"/>
+            <TextBlock x:Name="AppVersionTextBlock" Margin="0,5,0,0" Text="Version:" TextAlignment="Center" ToolTip="Current application version"/>
             <TextBlock x:Name="DescriptionTextBlock" TextWrapping="Wrap" Margin="0,25,0,0" Text="A simple utility to create batch files for launching your ScummVM games." ToolTip="Brief description of this utility"/>
             <TextBlock Margin="0,15,0,0" ToolTip="Visit the official website">
                 <Hyperlink NavigateUri="https://www.purelogiccode.com" RequestNavigate="Hyperlink_RequestNavigate" ToolTip="Open https://www.purelogiccode.com in your web browser">https://www.purelogiccode.com</Hyperlink>
             </TextBlock>
         </StackPanel>
 
-        <Button Grid.Row="2" Content="Close" Width="100" Margin="10" HorizontalAlignment="Center" Click="CloseButton_Click" IsDefault="True" ToolTip="Close this window"/>
+        <StackPanel Grid.Row="2" Margin="10" HorizontalAlignment="Center" Orientation="Horizontal">
+            <Button Content="Check for Updates" Width="120" Margin="0,0,10,0" Click="CheckForUpdatesButton_Click" ToolTip="Check GitHub for a new release"/>
+            <Button Content="Close" Width="100" Click="CloseButton_Click" IsDefault="True" ToolTip="Close this window"/>
+        </StackPanel>
     </Grid>
 </Window>
