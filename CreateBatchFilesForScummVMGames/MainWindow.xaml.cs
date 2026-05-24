@@ -146,8 +146,9 @@ public partial class MainWindow
             }
             finally
             {
-                _cts?.Dispose();
+                var cts = _cts;
                 _cts = null;
+                cts?.Dispose();
 
                 if (!_isShuttingDown)
                 {
@@ -187,13 +188,14 @@ public partial class MainWindow
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
-    internal static List<string> GetGameFolderCandidates(string rootFolder)
+    internal static List<string> GetGameFolderCandidates(string rootFolder, CancellationToken ct = default)
     {
         var result = new List<string>();
 
         foreach (var firstLevelDir in Directory.EnumerateDirectories(rootFolder))
         {
-            var gameFolder = FindGameFolder(firstLevelDir);
+            ct.ThrowIfCancellationRequested();
+            var gameFolder = FindGameFolder(firstLevelDir, ct);
             if (gameFolder != null)
                 result.Add(gameFolder);
         }
@@ -201,14 +203,17 @@ public partial class MainWindow
         return result;
     }
 
-    internal static string? FindGameFolder(string directory)
+    internal static string? FindGameFolder(string directory, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
+
         if (Directory.EnumerateFiles(directory).Any())
             return directory;
 
         foreach (var subDir in Directory.EnumerateDirectories(directory))
         {
-            var result = FindGameFolder(subDir);
+            ct.ThrowIfCancellationRequested();
+            var result = FindGameFolder(subDir, ct);
             if (result != null)
                 return result;
         }
@@ -223,9 +228,7 @@ public partial class MainWindow
         if (lastSep < 0)
             return relativePath;
 
-        var parent = string.Join('-', relativePath[..lastSep]
-            .Split(Path.DirectorySeparatorChar)
-            .Select(static s => s.Replace("-", "--")));
+        var parent = string.Join('-', relativePath[..lastSep].Split(Path.DirectorySeparatorChar));
         var folder = relativePath[(lastSep + 1)..];
         return $"{parent} ({folder})";
     }
@@ -234,7 +237,7 @@ public partial class MainWindow
     {
         try
         {
-            var gameDirectories = GetGameFolderCandidates(rootFolder);
+            var gameDirectories = GetGameFolderCandidates(rootFolder, ct);
             var filesCreated = 0;
 
             LogMessage("");
@@ -379,7 +382,7 @@ public partial class MainWindow
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        _cts?.Cancel();
+        try { _cts?.Cancel(); } catch (ObjectDisposedException) { /* already disposed */ }
         CancelButton.IsEnabled = false;
         CancelButton.Content = "Cancelling...";
     }

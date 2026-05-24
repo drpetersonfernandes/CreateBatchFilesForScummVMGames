@@ -28,7 +28,7 @@ public static partial class BatchFileGenerator
                     capitalize = false;
                 }
             }
-            else if (chars[i] is ' ' or '-' or '(' or ')')
+            else if (chars[i] is ' ' or '-' or '_' or '(' or ')')
             {
                 capitalize = true;
             }
@@ -46,7 +46,10 @@ public static partial class BatchFileGenerator
     {
         var sanitized = BatchFileNameInvalidChars().Replace(gameFolderName, "");
         sanitized = CollapseSpaces().Replace(sanitized, " ");
-        return $"{CapitalizeFileName(sanitized)}.bat";
+        sanitized = CapitalizeFileName(sanitized).Trim();
+        if (sanitized.Length == 0)
+            sanitized = "Game";
+        return $"{sanitized}.bat";
     }
 
     internal static string WriteBatchFile(string rootFolder, string gameDirectory, string scummvmExePath, string displayName)

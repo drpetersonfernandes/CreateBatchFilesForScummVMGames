@@ -174,7 +174,7 @@ public class BatchFileGeneratorTests
     public void GenerateBatchFileNameHandlesEmptyString()
     {
         var result = BatchFileGenerator.GenerateBatchFileName("");
-        Assert.Equal(".bat", result);
+        Assert.Equal("Game.bat", result);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class BatchFileGeneratorTests
     public void GenerateBatchFileNameHandlesStartingSeparator()
     {
         var result = BatchFileGenerator.GenerateBatchFileName(" the game");
-        Assert.Equal(" The Game.bat", result);
+        Assert.Equal("The Game.bat", result);
     }
 
     [Fact]
@@ -209,13 +209,13 @@ public class BatchFileGeneratorTests
     public void GenerateBatchFileNameCapitalizesAfterUnderscore()
     {
         var result = BatchFileGenerator.GenerateBatchFileName("foo_bar baz");
-        Assert.Equal("Foo_bar Baz.bat", result);
+        Assert.Equal("Foo_Bar Baz.bat", result);
     }
 
     [Fact]
     public void GenerateBatchFileNameHandlesAllProblematicChars()
     {
         var result = BatchFileGenerator.GenerateBatchFileName("&|<>^%!");
-        Assert.Equal(".bat", result);
+        Assert.Equal("Game.bat", result);
     }
 }
