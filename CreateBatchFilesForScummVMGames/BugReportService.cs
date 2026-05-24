@@ -93,6 +93,7 @@ public class BugReportService : IDisposable
 
         _disposed = true;
         _sendSemaphore.Dispose();
+
         GC.SuppressFinalize(this);
     }
 }

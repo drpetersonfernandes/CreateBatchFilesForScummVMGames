@@ -57,57 +57,6 @@ public class BatchFileGeneratorTests
     }
 
     [Fact]
-    public void GenerateSimpleScummVmContentReturnsJustGameId()
-    {
-        var result = BatchFileGenerator.GenerateSimpleScummVmContent("monkey");
-        Assert.Equal("monkey", result);
-    }
-
-    [Fact]
-    public void GenerateSimpleScummVmContentHandlesComplexIds()
-    {
-        var result = BatchFileGenerator.GenerateSimpleScummVmContent("comi-win");
-        Assert.Equal("comi-win", result);
-    }
-
-    [Fact]
-    public void GenerateSimpleScummVmFileNameCorrectFormat()
-    {
-        var result = BatchFileGenerator.GenerateSimpleScummVmFileName("monkey");
-        Assert.Equal("Monkey.scummvm", result);
-    }
-
-    [Fact]
-    public void GenerateRocknixScummVmContentCorrectFormat()
-    {
-        var result = BatchFileGenerator.GenerateRocknixScummVmContent(@"C:\Games\monkey", "monkey");
-        Assert.Equal("""--path="C:\Games\monkey" monkey""", result);
-    }
-
-    [Fact]
-    public void GenerateRocknixScummVmContentHandlesSpacesInPaths()
-    {
-        var result = BatchFileGenerator.GenerateRocknixScummVmContent(
-            @"C:\My Games\Monkey Island CD",
-            "monkey");
-        Assert.Equal("""--path="C:\My Games\Monkey Island CD" monkey""", result);
-    }
-
-    [Fact]
-    public void GenerateRocknixScummVmFileNameCorrectFormat()
-    {
-        var result = BatchFileGenerator.GenerateRocknixScummVmFileName("Monkey Island CD", "monkey");
-        Assert.Equal("Monkey Island CD (Monkey).scummvm", result);
-    }
-
-    [Fact]
-    public void GenerateRocknixScummVmFileNameHandlesSimpleNames()
-    {
-        var result = BatchFileGenerator.GenerateRocknixScummVmFileName("monkey", "monkey");
-        Assert.Equal("Monkey (Monkey).scummvm", result);
-    }
-
-    [Fact]
     public void GenerateBatchFileContentConsistentFormat()
     {
         var content = BatchFileGenerator.GenerateBatchFileContent("scummvm.exe", "game");
@@ -188,94 +137,6 @@ public class BatchFileGeneratorTests
     }
 
     [Fact]
-    public void WriteScummVmFilesCreatesBothSimpleAndRocknixFiles()
-    {
-        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var gameDir = Path.Combine(tempRoot, "Monkey Island");
-
-        try
-        {
-            Directory.CreateDirectory(gameDir);
-
-            var (simplePath, rocknixPath) = BatchFileGenerator.WriteScummVmFiles(tempRoot, "Monkey Island", gameDir, "monkey");
-
-            Assert.True(File.Exists(simplePath));
-            Assert.True(File.Exists(rocknixPath));
-            Assert.Equal(Path.Combine(tempRoot, "Monkey.scummvm"), simplePath);
-            Assert.Equal(Path.Combine(tempRoot, "Monkey Island (Monkey).scummvm"), rocknixPath);
-        }
-        finally
-        {
-            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
-        }
-    }
-
-    [Fact]
-    public void WriteScummVmFilesSimpleContentIsGameId()
-    {
-        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var gameDir = Path.Combine(tempRoot, "Test");
-
-        try
-        {
-            Directory.CreateDirectory(gameDir);
-
-            var (simplePath, _) = BatchFileGenerator.WriteScummVmFiles(tempRoot, "Test", gameDir, "monkey2");
-
-            Assert.Equal("monkey2", File.ReadAllText(simplePath));
-        }
-        finally
-        {
-            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
-        }
-    }
-
-    [Fact]
-    public void WriteScummVmFilesRocknixContentHasQuotedPathAndGameId()
-    {
-        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var gameDir = Path.Combine(tempRoot, "Test Game");
-
-        try
-        {
-            Directory.CreateDirectory(gameDir);
-
-            var (_, rocknixPath) = BatchFileGenerator.WriteScummVmFiles(tempRoot, "Test Game", gameDir, "monkey");
-
-            var content = File.ReadAllText(rocknixPath);
-            Assert.Contains($"--path=\"{gameDir}\"", content);
-            Assert.Contains(" monkey", content);
-        }
-        finally
-        {
-            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
-        }
-    }
-
-    [Fact]
-    public void WriteScummVmFilesHandlesHyphenatedGameIds()
-    {
-        var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var gameDir = Path.Combine(tempRoot, "CoMI");
-
-        try
-        {
-            Directory.CreateDirectory(gameDir);
-
-            var (simplePath, rocknixPath) = BatchFileGenerator.WriteScummVmFiles(tempRoot, "CoMI", gameDir, "comi-win");
-
-            Assert.True(File.Exists(simplePath));
-            Assert.True(File.Exists(rocknixPath));
-            Assert.Equal("Comi-Win.scummvm", Path.GetFileName(simplePath));
-            Assert.Equal("CoMI (Comi-Win).scummvm", Path.GetFileName(rocknixPath));
-        }
-        finally
-        {
-            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true);
-        }
-    }
-
-    [Fact]
     public void WriteBatchFileMultipleCallsDontConflict()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -310,9 +171,51 @@ public class BatchFileGeneratorTests
     }
 
     [Fact]
-    public void GenerateSimpleScummVmFileNameCapitalizesHyphenatedId()
+    public void GenerateBatchFileNameHandlesEmptyString()
     {
-        var result = BatchFileGenerator.GenerateSimpleScummVmFileName("comi-win");
-        Assert.Equal("Comi-Win.scummvm", result);
+        var result = BatchFileGenerator.GenerateBatchFileName("");
+        Assert.Equal(".bat", result);
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameHandlesOnlySymbols()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName("12345");
+        Assert.Equal("12345.bat", result);
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameHandlesStartingSeparator()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName(" the game");
+        Assert.Equal(" The Game.bat", result);
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameHandlesConsecutiveSeparators()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName("foo--bar  baz");
+        Assert.Equal("Foo--Bar  Baz.bat", result);
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameHandlesParenthesizedPrefix()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName("(foo) bar");
+        Assert.Equal("(Foo) Bar.bat", result);
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameCapitalizesAfterUnderscore()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName("foo_bar baz");
+        Assert.Equal("Foo_bar Baz.bat", result);
+    }
+
+    [Fact]
+    public void GenerateBatchFileNameHandlesAllProblematicChars()
+    {
+        var result = BatchFileGenerator.GenerateBatchFileName("&|<>^%!");
+        Assert.Equal(".bat", result);
     }
 }

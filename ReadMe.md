@@ -4,14 +4,16 @@ This application helps you create batch files for launching your ScummVM games. 
 
 ## Features
 
--   **User-Friendly Interface:** A simple and intuitive graphical user interface (GUI) with a top menu and status bar for easy interaction.
+-   **User-Friendly Interface:** A simple and intuitive GUI with a dark theme, top menu, and status bar for easy interaction.
 -   **ScummVM Executable Selection:** Allows you to browse and select the path to your `scummvm.exe` file.
 -   **Game Folder Selection:** Lets you choose the root folder containing your ScummVM game folders.
--   **Automated Batch File Creation:** Automatically generates batch files for each game folder within the selected root folder.
--   **Logging:** Provides a log window to display the progress and any errors that occur during the batch file creation process.
+-   **Automated Batch File Creation:** Automatically generates batch files for each game folder within the selected root folder (scans top-down for folders containing files).
+-   **Cancellation:** A cancel button allows you to stop the batch file creation process at any time.
+-   **Logging:** Provides a log window to display progress and any errors during batch file creation.
 -   **Status Bar:** Displays real-time status messages about the application's state.
 -   **Error Handling:** Includes error handling and reporting to ensure smooth operation and provide helpful feedback.
 -   **Silent Bug Reporting:** Automatically sends error reports to a backend API for tracking and fixing issues.
+-   **Update Checking:** Checks GitHub for new releases on startup and notifies you when a newer version is available.
 
 ## How to Use
 
@@ -34,16 +36,20 @@ This application helps you create batch files for launching your ScummVM games. 
 
 ## Code Structure
 
--   **App.xaml & App.xaml.cs:** Defines the application, handles global exception handling, and centrally manages the `BugReportService` instance.
--   **MainWindow.xaml & MainWindow.xaml.cs:** Defines the main window's UI and logic, including the menu, status bar, input fields, and batch file creation process.
+-   **App.xaml & App.xaml.cs:** Defines the application, handles global exception handling, and centrally manages service instances (`BugReportService`, `ApplicationStatsService`, `GitHubReleaseService`).
+-   **MainWindow.xaml & MainWindow.xaml.cs:** Defines the main window's UI and logic, including the menu, status bar, input fields, cancellation, update notification, and batch file creation process.
 -   **AboutWindow.xaml & AboutWindow.xaml.cs:** A separate window that displays application information, version, and credits.
--   **BugReportService.cs:** Implements a service for sending bug reports to a remote API. It uses a single, static `HttpClient` for efficiency.
+-   **BugReportService.cs:** Sends bug reports to a remote API using a shared `HttpClient` with concurrency throttling.
+-   **AssemblyInfo.cs:** Contains assembly-level metadata attributes.
+-   **Services/BatchFileGenerator.cs:** Generates batch file content and handles filename sanitization/capitalization.
+-   **Services/GitHubReleaseService.cs:** Checks the GitHub API for new releases and compares versions.
 
-## Error Reporting
+## Background Services
 
-The application includes a `BugReportService` that silently sends error reports to a specified API endpoint. This helps the developer track and fix issues. The API URL and key are defined as constants in `App.xaml.cs`.
+The application initializes several services at startup for silent background operation:
 
-**Important:** The `BugReportApiUrl` and `BugReportApiKey` are placeholders. You will need to replace them with your own values if you want to use the bug reporting functionality.
+-   **Bug Reporting:** `BugReportService` sends error reports to a specified API endpoint to help track and fix issues. Uses a semaphore to prevent concurrent request flooding.
+-   **Update Checking:** `GitHubReleaseService` queries the GitHub Releases API and notifies the user if a newer version is available.
 
 ## Batch File Format
 

@@ -45,41 +45,10 @@ public static partial class BatchFileGenerator
         return $"{CapitalizeFileName(sanitized)}.bat";
     }
 
-    public static string GenerateSimpleScummVmContent(string gameId)
-    {
-        return gameId;
-    }
-
-    public static string GenerateSimpleScummVmFileName(string gameId)
-    {
-        return $"{CapitalizeFileName(gameId)}.scummvm";
-    }
-
-    public static string GenerateRocknixScummVmContent(string gameDirectory, string gameId)
-    {
-        return $"--path=\"{gameDirectory}\" {gameId}";
-    }
-
-    public static string GenerateRocknixScummVmFileName(string gameFolderName, string gameId)
-    {
-        return $"{CapitalizeFileName(gameFolderName)} ({CapitalizeFileName(gameId)}).scummvm";
-    }
-
     internal static string WriteBatchFile(string rootFolder, string gameDirectory, string scummvmExePath, string displayName)
     {
         var batchFilePath = Path.Combine(rootFolder, GenerateBatchFileName(displayName));
         File.WriteAllText(batchFilePath, GenerateBatchFileContent(scummvmExePath, gameDirectory));
         return batchFilePath;
-    }
-
-    internal static (string SimplePath, string RocknixPath) WriteScummVmFiles(string rootFolder, string displayName, string gameDirectory, string gameId)
-    {
-        var simplePath = Path.Combine(rootFolder, GenerateSimpleScummVmFileName(gameId));
-        File.WriteAllText(simplePath, GenerateSimpleScummVmContent(gameId));
-
-        var rocknixPath = Path.Combine(rootFolder, GenerateRocknixScummVmFileName(displayName, gameId));
-        File.WriteAllText(rocknixPath, GenerateRocknixScummVmContent(gameDirectory, gameId));
-
-        return (simplePath, rocknixPath);
     }
 }

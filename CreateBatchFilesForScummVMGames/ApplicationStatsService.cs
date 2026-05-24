@@ -43,9 +43,9 @@ public class ApplicationStatsService : IDisposable
 
             await HttpClient.SendAsync(request);
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail if the stats API is unreachable
+            _ = App.SendBugReportAsync("Failed to send usage statistics to the stats API", ex);
         }
     }
 
@@ -54,6 +54,7 @@ public class ApplicationStatsService : IDisposable
         if (_disposed) return;
 
         _disposed = true;
+
         GC.SuppressFinalize(this);
     }
 }

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Threading;
+using CreateBatchFilesForScummVMGames.Services;
 
 namespace CreateBatchFilesForScummVMGames;
 
@@ -34,6 +35,16 @@ public partial class App
     /// </summary>
     public static ApplicationStatsService? ApplicationStatsService { get; private set; }
 
+    /// <summary>
+    /// Provides a single, shared instance of the GitHubReleaseService for the entire application.
+    /// </summary>
+    public static GitHubReleaseService? GitHubReleaseService { get; private set; }
+
+    /// <summary>
+    /// Holds the latest release info fetched at startup, or null if the check failed.
+    /// </summary>
+    public static ReleaseInfo? LatestReleaseInfo { get; private set; }
+
     public App()
     {
         var version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0";
@@ -43,7 +54,11 @@ public partial class App
 
         // Initialize the application stats service and track this launch.
         ApplicationStatsService = new ApplicationStatsService(StatsApiUrl, BugReportApiKey, StatsApplicationId, version);
-        TrackApplicationLaunch();
+        TrackApplicationLaunchAsync();
+
+        // Initialize the GitHub release service and check for updates.
+        GitHubReleaseService = new GitHubReleaseService();
+        _ = CheckForUpdateAsync();
 
         // Set up global exception handling
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -51,7 +66,7 @@ public partial class App
         TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
     }
 
-    private static async void TrackApplicationLaunch()
+    private static async void TrackApplicationLaunchAsync()
     {
         try
         {
@@ -60,9 +75,24 @@ public partial class App
                 await ApplicationStatsService.SendUsageStatAsync();
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently ignore any errors in the tracking process
+            await SendBugReportAsync("Failed to track application launch stats", ex);
+        }
+    }
+
+    private static async Task CheckForUpdateAsync()
+    {
+        try
+        {
+            if (GitHubReleaseService != null)
+            {
+                LatestReleaseInfo = await GitHubReleaseService.CheckForUpdateAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await SendBugReportAsync("Failed to check for GitHub updates", ex);
         }
     }
 
@@ -81,6 +111,15 @@ public partial class App
         try
         {
             ApplicationStatsService?.Dispose();
+        }
+        catch
+        {
+            // ignored
+        }
+
+        try
+        {
+            GitHubReleaseService?.Dispose();
         }
         catch
         {
@@ -134,6 +173,36 @@ public partial class App
         catch
         {
             // Silently ignore any errors in the reporting process
+        }
+    }
+
+    internal static async Task SendBugReportAsync(string errorMessage, Exception? exception = null)
+    {
+        try
+        {
+            if (BugReportService == null) return;
+
+            var sb = new StringBuilder();
+            sb.Append(BuildEnvironmentDetails());
+            sb.AppendLine("=== Error Details ===");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Error Message: {errorMessage}");
+            sb.AppendLine();
+
+            if (exception != null)
+            {
+                sb.AppendLine("=== Exception Details ===");
+                AppendExceptionDetails(sb, exception);
+            }
+
+            var version = typeof(App).Assembly.GetName().Version?.ToString();
+            var environment = RuntimeInformation.OSDescription;
+            var stackTrace = exception?.StackTrace;
+
+            await BugReportService.SendBugReportAsync(sb.ToString(), version, environment, stackTrace);
+        }
+        catch
+        {
+            // Silently fail if error reporting itself fails
         }
     }
 

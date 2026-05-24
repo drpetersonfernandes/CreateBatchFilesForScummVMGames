@@ -12,18 +12,18 @@
             <RowDefinition Height="Auto"/> <!-- Status Bar -->
         </Grid.RowDefinitions>
 
-        <Menu Grid.Row="0">
+        <Menu Grid.Row="0" ToolTip="Application menu bar">
             <MenuItem Header="_File" ToolTip="File operations">
                 <MenuItem Header="E_xit" Click="ExitMenuItem_Click" ToolTip="Close the application">
                     <MenuItem.Icon>
-                        <Image Source="pack://application:,,,/images/exit.png" Width="16" Height="16" />
+                        <Image Source="pack://application:,,,/images/exit.png" Width="16" Height="16" ToolTip="Exit application icon"/>
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="_Help" ToolTip="Help and information">
                 <MenuItem Header="_About" Click="AboutMenuItem_Click" ToolTip="View application version and details">
                     <MenuItem.Icon>
-                        <Image Source="pack://application:,,,/images/about.png" Width="16" Height="16" />
+                        <Image Source="pack://application:,,,/images/about.png" Width="16" Height="16" ToolTip="About menu icon"/>
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
@@ -86,8 +86,8 @@
         </Grid>
 
         <!-- Status Bar -->
-        <StatusBar Grid.Row="2">
-            <StatusBarItem>
+        <StatusBar Grid.Row="2" ToolTip="Application status bar">
+            <StatusBarItem ToolTip="Status information container">
                 <TextBlock x:Name="StatusBarMessage" Text="Ready" ToolTip="Application status messages" />
             </StatusBarItem>
         </StatusBar>

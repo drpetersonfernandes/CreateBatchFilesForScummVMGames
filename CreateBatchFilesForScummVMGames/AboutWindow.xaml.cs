@@ -33,11 +33,7 @@ public partial class AboutWindow
         }
         catch (Exception ex)
         {
-            // Notify developer
-            if (App.BugReportService != null)
-            {
-                _ = App.BugReportService.SendBugReportAsync($"Error opening URL: {e.Uri.AbsoluteUri}. Exception: {ex.Message}");
-            }
+            _ = App.SendBugReportAsync($"Error opening URL: {e.Uri.AbsoluteUri}", ex);
 
             // Notify user
             MessageBox.Show(this, $"Unable to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);

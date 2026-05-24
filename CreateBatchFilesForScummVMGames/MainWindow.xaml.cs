@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -12,6 +13,7 @@ namespace CreateBatchFilesForScummVMGames;
 public partial class MainWindow
 {
     private CancellationTokenSource? _cts;
+    private bool _isClosing;
 
     public MainWindow()
     {
@@ -26,6 +28,15 @@ public partial class MainWindow
         LogMessage("3. Click 'Create Batch Files' to generate the batch files");
         LogMessage("");
         UpdateStatusBarMessage("Ready");
+
+        Loaded += OnMainWindowLoaded;
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        _isClosing = true;
+        _cts?.Cancel();
+        base.OnClosing(e);
     }
 
     private void UpdateStatusBarMessage(string message)
@@ -137,10 +148,14 @@ public partial class MainWindow
             {
                 _cts?.Dispose();
                 _cts = null;
-                CreateBatchFilesButton.IsEnabled = true;
-                CreateBatchFilesButton.Content = "Create Batch Files";
-                CancelButton.Visibility = Visibility.Collapsed;
-                Mouse.OverrideCursor = null;
+
+                if (!_isClosing)
+                {
+                    CreateBatchFilesButton.IsEnabled = true;
+                    CreateBatchFilesButton.Content = "Create Batch Files";
+                    CancelButton.Visibility = Visibility.Collapsed;
+                    Mouse.OverrideCursor = null;
+                }
             }
         }
         catch (Exception ex)
@@ -282,12 +297,12 @@ public partial class MainWindow
         }
     }
 
-    private void ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
+    private MessageBoxResult ShowMessageBox(string message, string title, MessageBoxButton buttons, MessageBoxImage icon)
     {
         if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
-            Application.Current.Dispatcher.Invoke(() => MessageBox.Show(this, message, title, buttons, icon));
+            return Application.Current.Dispatcher.Invoke(() => MessageBox.Show(this, message, title, buttons, icon));
         else
-            MessageBox.Show(this, message, title, buttons, icon);
+            return MessageBox.Show(this, message, title, buttons, icon);
     }
 
     private void ShowError(string message)
@@ -369,7 +384,7 @@ public partial class MainWindow
 
     private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        Application.Current.Shutdown();
     }
 
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
@@ -383,6 +398,55 @@ public partial class MainWindow
         {
             LogMessage($"Error opening About window: {ex.Message}");
             _ = ReportBugAsync("Error opening About window", ex);
+        }
+    }
+
+    private async void OnMainWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Loaded -= OnMainWindowLoaded;
+
+            await Task.Delay(500);
+
+            var releaseInfo = App.LatestReleaseInfo;
+
+            if (releaseInfo is { IsNewVersionAvailable: true, LatestVersion: not null, ReleaseUrl: not null })
+            {
+                LogMessage("");
+                LogMessage($"A new version ({releaseInfo.LatestVersion}) is available!");
+                LogMessage($"Download it at: {releaseInfo.ReleaseUrl}");
+
+                var result = ShowMessageBox(
+                    $"A new version ({releaseInfo.LatestVersion}) is available for download.\n\n" +
+                    $"Would you like to open the release page?\n\n{releaseInfo.ReleaseUrl}",
+                    "Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    OpenUrl(releaseInfo.ReleaseUrl);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = App.SendBugReportAsync("Error in method OnMainWindowLoaded", ex);
+        }
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _ = App.SendBugReportAsync($"Failed to open URL: {url}", ex);
         }
     }
 }
