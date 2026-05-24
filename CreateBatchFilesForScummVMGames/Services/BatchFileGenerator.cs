@@ -8,6 +8,9 @@ public static partial class BatchFileGenerator
     [GeneratedRegex("[&|<>^%!]")]
     private static partial Regex BatchFileNameInvalidChars();
 
+    [GeneratedRegex(" {2,}")]
+    private static partial Regex CollapseSpaces();
+
     private static string CapitalizeFileName(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -25,7 +28,7 @@ public static partial class BatchFileGenerator
                     capitalize = false;
                 }
             }
-            else if (chars[i] is ' ' or '-' or '(')
+            else if (chars[i] is ' ' or '-' or '(' or ')')
             {
                 capitalize = true;
             }
@@ -42,6 +45,7 @@ public static partial class BatchFileGenerator
     public static string GenerateBatchFileName(string gameFolderName)
     {
         var sanitized = BatchFileNameInvalidChars().Replace(gameFolderName, "");
+        sanitized = CollapseSpaces().Replace(sanitized, " ");
         return $"{CapitalizeFileName(sanitized)}.bat";
     }
 

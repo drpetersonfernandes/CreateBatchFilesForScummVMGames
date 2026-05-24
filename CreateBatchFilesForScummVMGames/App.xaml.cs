@@ -25,6 +25,9 @@ public partial class App
 
     private static bool _isShuttingDown;
 
+    private static Task? _launchTrackingTask;
+    private static Task? _updateCheckTask;
+
     /// <summary>
     /// Provides a single, shared instance of the BugReportService for the entire application.
     /// </summary>
@@ -47,18 +50,18 @@ public partial class App
 
     public App()
     {
-        var version = GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0";
+        var version = typeof(App).Assembly.GetName().Version?.ToString() ?? "1.0.0";
 
         // Initialize the single bug report service instance for the application.
         BugReportService = new BugReportService(BugReportApiUrl, BugReportApiKey, ApplicationName);
 
         // Initialize the application stats service and track this launch.
         ApplicationStatsService = new ApplicationStatsService(StatsApiUrl, BugReportApiKey, StatsApplicationId, version);
-        TrackApplicationLaunchAsync();
+        _launchTrackingTask = TrackApplicationLaunchAsync();
 
         // Initialize the GitHub release service and check for updates.
         GitHubReleaseService = new GitHubReleaseService();
-        _ = CheckForUpdateAsync();
+        _updateCheckTask = CheckForUpdateAsync();
 
         // Set up global exception handling
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
@@ -66,7 +69,7 @@ public partial class App
         TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
     }
 
-    private static async void TrackApplicationLaunchAsync()
+    private static async Task TrackApplicationLaunchAsync()
     {
         try
         {
@@ -99,6 +102,23 @@ public partial class App
     protected override void OnExit(ExitEventArgs e)
     {
         _isShuttingDown = true;
+
+        // Wait for fire-and-forget startup operations to complete before
+        // disposing their dependent services.
+        if (_launchTrackingTask != null || _updateCheckTask != null)
+        {
+            try
+            {
+                Task.WaitAll(
+                    new[] { _launchTrackingTask, _updateCheckTask }.Where(static t => t != null).Cast<Task>().ToArray(),
+                    TimeSpan.FromSeconds(5));
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
         try
         {
             BugReportService?.Dispose();
@@ -180,7 +200,7 @@ public partial class App
     {
         try
         {
-            if (BugReportService == null) return;
+            if (_isShuttingDown || BugReportService == null) return;
 
             var sb = new StringBuilder();
             sb.Append(BuildEnvironmentDetails());

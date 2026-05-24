@@ -13,7 +13,7 @@ namespace CreateBatchFilesForScummVMGames;
 public partial class MainWindow
 {
     private CancellationTokenSource? _cts;
-    private bool _isClosing;
+    private bool _isShuttingDown;
 
     public MainWindow()
     {
@@ -34,7 +34,7 @@ public partial class MainWindow
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        _isClosing = true;
+        _isShuttingDown = true;
         _cts?.Cancel();
         base.OnClosing(e);
     }
@@ -149,7 +149,7 @@ public partial class MainWindow
                 _cts?.Dispose();
                 _cts = null;
 
-                if (!_isClosing)
+                if (!_isShuttingDown)
                 {
                     CreateBatchFilesButton.IsEnabled = true;
                     CreateBatchFilesButton.Content = "Create Batch Files";
@@ -187,7 +187,7 @@ public partial class MainWindow
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
-    private static List<string> GetGameFolderCandidates(string rootFolder)
+    internal static List<string> GetGameFolderCandidates(string rootFolder)
     {
         var result = new List<string>();
 
@@ -201,7 +201,7 @@ public partial class MainWindow
         return result;
     }
 
-    private static string? FindGameFolder(string directory)
+    internal static string? FindGameFolder(string directory)
     {
         if (Directory.EnumerateFiles(directory).Any())
             return directory;
@@ -216,14 +216,16 @@ public partial class MainWindow
         return null;
     }
 
-    private static string GetGameDisplayName(string rootFolder, string gameDirectory)
+    internal static string GetGameDisplayName(string rootFolder, string gameDirectory)
     {
         var relativePath = Path.GetRelativePath(rootFolder, gameDirectory);
         var lastSep = relativePath.LastIndexOf(Path.DirectorySeparatorChar);
         if (lastSep < 0)
             return relativePath;
 
-        var parent = relativePath[..lastSep].Replace(Path.DirectorySeparatorChar, '-');
+        var parent = string.Join('-', relativePath[..lastSep]
+            .Split(Path.DirectorySeparatorChar)
+            .Select(static s => s.Replace("-", "--")));
         var folder = relativePath[(lastSep + 1)..];
         return $"{parent} ({folder})";
     }
@@ -315,7 +317,7 @@ public partial class MainWindow
         try
         {
             var fullReport = new StringBuilder();
-            var assemblyName = GetType().Assembly.GetName();
+            var assemblyName = typeof(App).Assembly.GetName();
 
             fullReport.Append(App.BuildEnvironmentDetails());
 
@@ -430,11 +432,11 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _ = App.SendBugReportAsync("Error in method OnMainWindowLoaded", ex);
+            _ = ReportBugAsync("Error in method OnMainWindowLoaded", ex);
         }
     }
 
-    private static void OpenUrl(string url)
+    private void OpenUrl(string url)
     {
         try
         {
@@ -446,7 +448,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _ = App.SendBugReportAsync($"Failed to open URL: {url}", ex);
+            _ = ReportBugAsync($"Failed to open URL: {url}", ex);
         }
     }
 }

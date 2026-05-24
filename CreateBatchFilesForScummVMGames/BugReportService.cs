@@ -61,7 +61,14 @@ public class BugReportService : IDisposable
             // Wait for exclusive access so we never flood the API with
             // concurrent requests (important when many failures occur in a
             // batch loop).
-            await _sendSemaphore.WaitAsync();
+            try
+            {
+                await _sendSemaphore.WaitAsync();
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
 
             try
             {
@@ -78,7 +85,13 @@ public class BugReportService : IDisposable
             }
             finally
             {
-                _sendSemaphore.Release();
+                try
+                {
+                    _sendSemaphore.Release();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
             }
         }
         catch
@@ -92,6 +105,18 @@ public class BugReportService : IDisposable
         if (_disposed) return;
 
         _disposed = true;
+
+        // Wait for any in-flight send to complete before disposing the semaphore.
+        // A short timeout prevents hanging indefinitely during shutdown.
+        try
+        {
+            _sendSemaphore.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch
+        {
+            // ignored
+        }
+
         _sendSemaphore.Dispose();
 
         GC.SuppressFinalize(this);

@@ -15,7 +15,7 @@ public partial class AboutWindow
 
     private static string GetApplicationVersion()
     {
-        var version = typeof(AboutWindow).Assembly.GetName().Version;
+        var version = typeof(App).Assembly.GetName().Version;
         return version?.ToString() ?? "Unknown";
     }
 

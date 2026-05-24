@@ -42,13 +42,13 @@ public class BatchFileGeneratorTests
     }
 
     [Theory]
-    [InlineData("Game & Watch", "Game  Watch.bat")]
-    [InlineData("Foo ^ Bar", "Foo  Bar.bat")]
+    [InlineData("Game & Watch", "Game Watch.bat")]
+    [InlineData("Foo ^ Bar", "Foo Bar.bat")]
     [InlineData("100% Game", "100 Game.bat")]
     [InlineData("Hello! World", "Hello World.bat")]
-    [InlineData("A | B", "A  B.bat")]
-    [InlineData("Left < Right", "Left  Right.bat")]
-    [InlineData("One > Two", "One  Two.bat")]
+    [InlineData("A | B", "A B.bat")]
+    [InlineData("Left < Right", "Left Right.bat")]
+    [InlineData("One > Two", "One Two.bat")]
     [InlineData("A&B^C%D!E|F<G>H", "ABCDEFGH.bat")]
     public void GenerateBatchFileNameStripsBatchProblematicChars(string input, string expected)
     {
@@ -195,7 +195,7 @@ public class BatchFileGeneratorTests
     public void GenerateBatchFileNameHandlesConsecutiveSeparators()
     {
         var result = BatchFileGenerator.GenerateBatchFileName("foo--bar  baz");
-        Assert.Equal("Foo--Bar  Baz.bat", result);
+        Assert.Equal("Foo--Bar Baz.bat", result);
     }
 
     [Fact]

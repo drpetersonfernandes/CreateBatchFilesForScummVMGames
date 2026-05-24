@@ -36,58 +36,17 @@ public class MainWindowTests : IDisposable
         Directory.CreateDirectory(emptyDir);
     }
 
-    private static string GetGameDisplayName(string rootFolder, string gameDirectory)
-    {
-        var relativePath = Path.GetRelativePath(rootFolder, gameDirectory);
-        var lastSep = relativePath.LastIndexOf(Path.DirectorySeparatorChar);
-        if (lastSep < 0)
-            return relativePath;
-
-        var parent = relativePath[..lastSep].Replace(Path.DirectorySeparatorChar, '-');
-        var folder = relativePath[(lastSep + 1)..];
-        return $"{parent} ({folder})";
-    }
-
-    private static List<string> GetGameFolderCandidates(string rootFolder)
-    {
-        var result = new List<string>();
-
-        foreach (var firstLevelDir in Directory.EnumerateDirectories(rootFolder))
-        {
-            var gameFolder = FindGameFolder(firstLevelDir);
-            if (gameFolder != null)
-                result.Add(gameFolder);
-        }
-
-        return result;
-    }
-
-    private static string? FindGameFolder(string directory)
-    {
-        if (Directory.EnumerateFiles(directory).Any())
-            return directory;
-
-        foreach (var subDir in Directory.EnumerateDirectories(directory))
-        {
-            var result = FindGameFolder(subDir);
-            if (result != null)
-                return result;
-        }
-
-        return null;
-    }
-
     private static List<string> SimulateBatchFileCreation(string rootFolder, string scummvmExePath)
     {
         if (!Directory.Exists(rootFolder))
             Directory.CreateDirectory(rootFolder);
 
-        var gameDirectories = GetGameFolderCandidates(rootFolder);
+        var gameDirectories = MainWindow.GetGameFolderCandidates(rootFolder);
         var createdFiles = new List<string>();
 
         foreach (var gameDirectory in gameDirectories)
         {
-            var displayName = GetGameDisplayName(rootFolder, gameDirectory);
+            var displayName = MainWindow.GetGameDisplayName(rootFolder, gameDirectory);
             var path = BatchFileGenerator.WriteBatchFile(rootFolder, gameDirectory, scummvmExePath, displayName);
             createdFiles.Add(path);
         }

@@ -45,7 +45,7 @@ public sealed class GitHubReleaseService : IDisposable
             if (string.IsNullOrEmpty(tagName)) return null;
 
             var latestVersion = StripVPrefix(tagName);
-            var currentVersion = GetType().Assembly.GetName().Version;
+            var currentVersion = typeof(App).Assembly.GetName().Version;
 
             if (currentVersion == null) return null;
 
