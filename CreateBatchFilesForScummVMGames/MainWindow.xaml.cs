@@ -382,7 +382,15 @@ public partial class MainWindow
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        try { _cts?.Cancel(); } catch (ObjectDisposedException) { /* already disposed */ }
+        try
+        {
+            _cts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            /* already disposed */
+        }
+
         CancelButton.IsEnabled = false;
         CancelButton.Content = "Cancelling...";
     }

@@ -48,7 +48,10 @@ public static partial class BatchFileGenerator
         sanitized = CollapseSpaces().Replace(sanitized, " ");
         sanitized = CapitalizeFileName(sanitized).Trim();
         if (sanitized.Length == 0)
+        {
             sanitized = "Game";
+        }
+
         return $"{sanitized}.bat";
     }
 
